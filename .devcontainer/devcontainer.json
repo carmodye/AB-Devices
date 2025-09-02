@@ -1,0 +1,62 @@
+// // https://aka.ms/devcontainer.json
+// {
+// 	"name": "Existing Docker Compose (Extend)",
+// 	"dockerComposeFile": [
+// 		"../docker-compose.yml"
+// 	],
+// 	"service": "laravel.test",
+// 	"workspaceFolder": "/var/www/html",
+// 	"customizations": {
+// 		"vscode": {
+// 			"extensions": [
+// 				"laravel.vscode-laravel",
+// 				"mikestead.dotenv",
+// 				"amiralizadeh9480.laravel-extra-intellisense",
+// 				"ryannaddy.laravel-artisan",
+// 				"onecentlin.laravel5-snippets",
+// 				"onecentlin.laravel-blade",
+// 				"damms005.devdb",
+// 				"devsense.phptools-vscode"
+// 			],
+// 			"settings": {}
+// 		}
+// 	},
+// 	"remoteUser": "sail",
+// 	"postCreateCommand": "chown -R 1000:1000 /var/www/html 2>/dev/null || true"
+// 	// "forwardPorts": [],
+// 	// "runServices": [],
+// 	// "shutdownAction": "none",
+// }
+{
+	"name": "Laravel Sail Dev Container",
+	"dockerComposeFile": [
+		"../docker-compose.yml"
+	],
+	"service": "laravel.test",
+	"workspaceFolder": "/var/www/html",
+	"settings": {
+		"terminal.integrated.defaultProfile.linux": "bash",
+		"php.validate.executablePath": "/usr/bin/php",
+		"editor.formatOnSave": true
+	},
+	"extensions": [
+		"bmewburn.vscode-intelephense-client",
+		"xdebug.php-debug",
+		"mehedidracula.php-namespace-resolver",
+		"onecentlin.laravel-blade",
+		"ryannaddy.laravel-artisan",
+		"laravel.vscode-laravel",
+		"mikestead.dotenv",
+		"amiralizadeh9480.laravel-extra-intellisense",
+		"ryannaddy.laravel-artisan",
+		"onecentlin.laravel5-snippets",
+		"damms005.devdb",
+		"devsense.phptools-vscode"
+	],
+	"forwardPorts": [
+		80,
+		443
+	],
+	"postCreateCommand": "composer install && php artisan sail:install --no-interaction",
+	"remoteUser": "sail"
+}
