@@ -7,48 +7,64 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Models\Client;
+use App\Models\Device;
+use Carbon\Carbon;
 
 class FetchDeviceData extends Command
 {
-    protected $signature = 'devices:fetch';
-    protected $description = 'Fetch device data for all clients and cache results';
+    protected $signature = 'devices:fetch {--client=}';
+    protected $description = 'Fetch device data for all clients or a specific client and store in database';
 
     public function handle()
     {
-        $clients = Client::pluck('name')->toArray();
+        $client = $this->option('client');
+        $clients = $client ? [$client] : Client::pluck('name')->toArray();
         Log::info('FetchDeviceData command started', ['clients' => $clients]);
 
         foreach ($clients as $client) {
             try {
-                $cacheKey = 'devices_' . $client;
-                $cacheTTL = now()->addMinutes(10);
+                $url = env('DEVICE_API_URL');
+                if (!$url) {
+                    Log::error('DEVICE_API_URL not set', ['client' => $client]);
+                    throw new \Exception('API URL not configured');
+                }
+                $response = Http::timeout(10)->get($url, ['client' => $client]);
+                Log::info('API Response', [
+                    'client' => $client,
+                    'url' => $url . '?client=' . $client,
+                    'status' => $response->status(),
+                    'body_size' => strlen($response->body()) / 1024 / 1024 . 'MB',
+                    'device_count' => is_array($response->json()) ? count($response->json()) : 0
+                ]);
 
-                $devices = Cache::remember($cacheKey, $cacheTTL, function () use ($client, $cacheKey, $cacheTTL) {
-                    $url = env('DEVICE_API_URL');
-                    if (!$url) {
-                        Log::error('DEVICE_API_URL not set', ['client' => $client]);
-                        throw new \Exception('API URL not configured');
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $devices = is_array($data) ? $data : [];
+
+                    // Clear existing devices for the client
+                    Device::where('client', $client)->delete();
+
+                    // Insert new devices
+                    foreach ($devices as $device) {
+                        Device::create([
+                            'client' => $device['client'] ?? $client,
+                            'operatingSystem' => $device['operatingSystem'] ?? null,
+                            'macAddress' => $device['macAddress'] ?? null,
+                            'model' => $device['model'] ?? null,
+                            'firmwareVersion' => $device['firmwareVersion'] ?? null,
+                            'screenshot' => $device['screenshot'] ?? null,
+                            'oopsscreen' => isset($device['oopsscreen']) ? (bool) $device['oopsscreen'] : null,
+                            'lastreboot' => isset($device['lastreboot']) ? Carbon::parse($device['lastreboot']) : null,
+                            'unixepoch' => $device['unixepoch'] ?? null,
+                        ]);
                     }
-                    $response = Http::timeout(10)->get($url, [
-                        'client' => $client
-                    ]);
-                    Log::info('API Response', [
-                        'client' => $client,
-                        'url' => $url . '?client=' . $client,
-                        'status' => $response->status(),
-                        'body' => $response->body()
-                    ]);
-                    if ($response->successful()) {
-                        $data = $response->json();
-                        $result = collect(is_array($data) ? $data : []);
-                        Cache::put($cacheKey . '_last_api_call', now()->toDateTimeString(), $cacheTTL);
-                        return $result;
-                    }
+
+                    Cache::put('devices_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
+                    Log::info('Devices stored for client', ['client' => $client, 'count' => count($devices)]);
+                } else {
                     Log::error('API request failed', ['client' => $client, 'status' => $response->status()]);
                     throw new \Exception('API request failed with status: ' . $response->status());
-                });
-
-                Log::info('Devices cached for client', ['client' => $client, 'count' => $devices->count()]);
+                }
             } catch (\Exception $e) {
                 Log::error('Error fetching devices for client', [
                     'client' => $client,

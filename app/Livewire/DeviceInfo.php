@@ -4,11 +4,10 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Models\Client;
-use Illuminate\Support\Collection;
+use App\Models\Device;
 use Carbon\Carbon;
 
 class DeviceInfo extends Component
@@ -17,14 +16,13 @@ class DeviceInfo extends Component
 
     public $client = '';
     public $clients = [];
-    public $devices;
     public $error = '';
     public $perPage = 50;
     public $timezone = 'America/New_York';
     public $lastApiCall = null;
-    public $sortField = 'last_status'; // Default sort by Last Status
-    public $sortDirection = 'desc'; // Default descending
-    public $macSearch = ''; // MAC address search
+    public $sortField = 'last_status';
+    public $sortDirection = 'desc';
+    public $macSearch = '';
 
     protected $paginationTheme = 'tailwind';
 
@@ -32,11 +30,8 @@ class DeviceInfo extends Component
     {
         Log::info('Mount called', ['client' => $this->client]);
         $this->clients = Client::pluck('name')->toArray();
-        $this->devices = collect([]);
         $this->client = !empty($this->clients) ? $this->clients[0] : '';
         if ($this->client) {
-            Log::info('Loading cached devices on mount', ['client' => $this->client]);
-            $this->loadCachedDevices();
             $this->loadLastApiCall();
         }
     }
@@ -45,13 +40,11 @@ class DeviceInfo extends Component
     {
         Log::info('updatedClient called', ['client' => $value, 'previous_client' => $this->client]);
         $this->client = $value;
-        $this->macSearch = ''; // Reset MAC search on client change
+        $this->macSearch = '';
         $this->resetPage();
         if ($this->client) {
-            $this->loadCachedDevices();
             $this->loadLastApiCall();
         } else {
-            $this->devices = collect([]);
             $this->error = 'Please select a client';
             $this->lastApiCall = null;
         }
@@ -85,93 +78,10 @@ class DeviceInfo extends Component
     {
         Log::info('refreshDevices called', ['client' => $this->client]);
         if ($this->client) {
-            Cache::forget('devices_' . $this->client);
             Cache::forget('devices_' . $this->client . '_last_api_call');
-            $this->fetchDevices();
+            \Artisan::call('devices:fetch', ['--client' => $this->client]);
             $this->loadLastApiCall();
-            $this->emit('refresh');
-        }
-    }
-
-    public function loadCachedDevices()
-    {
-        Log::info('loadCachedDevices called', ['client' => $this->client]);
-        $this->devices = collect([]);
-        $this->error = '';
-
-        if (empty($this->client)) {
-            $this->error = 'Please select a client';
-            Log::warning('No client selected');
-            return;
-        }
-
-        $cacheKey = 'devices_' . $this->client;
-        $cachedDevices = Cache::get($cacheKey);
-        if ($cachedDevices) {
-            $this->devices = $cachedDevices;
-            Log::info('Loaded cached devices', ['client' => $this->client, 'count' => $this->devices->count()]);
-        } else {
-            $this->error = 'No cached data available for client: ' . $this->client;
-            Log::warning('No cached data found', ['client' => $this->client]);
-        }
-
-        if ($this->devices->isEmpty()) {
-            $this->error = 'No devices found for client: ' . $this->client;
-        }
-    }
-
-    public function fetchDevices()
-    {
-        Log::info('fetchDevices called', ['client' => $this->client]);
-        $this->devices = collect([]);
-        $this->error = '';
-
-        if (empty($this->client)) {
-            $this->error = 'Please select a client';
-            Log::warning('No client selected');
-            return;
-        }
-
-        try {
-            $cacheKey = 'devices_' . $this->client;
-            $cacheTTL = now()->addMinutes(10);
-
-            $this->devices = Cache::remember($cacheKey, $cacheTTL, function () use ($cacheKey) {
-                $url = env('DEVICE_API_URL');
-                if (!$url) {
-                    Log::error('DEVICE_API_URL not set');
-                    throw new \Exception('API URL not configured');
-                }
-                $response = Http::timeout(10)->get($url, [
-                    'client' => $this->client
-                ]);
-                Log::info('API Response', [
-                    'url' => $url . '?client=' . $this->client,
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-                if ($response->successful()) {
-                    $data = $response->json();
-                    $result = collect(is_array($data) ? $data : []);
-                    Cache::put($cacheKey . '_last_api_call', now()->toDateTimeString(), $cacheTTL);
-                    return $result;
-                }
-                Log::error('API request failed', ['status' => $response->status()]);
-                throw new \Exception('API request failed with status: ' . $response->status());
-            });
-
-            if ($this->devices->isEmpty()) {
-                $this->error = 'No devices found for client: ' . $this->client;
-                Log::warning('No devices found', ['client' => $this->client]);
-            }
-        } catch (\Exception $e) {
-            $this->error = 'Error fetching devices: ' . $e->getMessage();
-            $this->devices = collect([]);
-            $this->lastApiCall = null;
-            Log::error('API Request Exception', [
-                'error' => $e->getMessage(),
-                'client' => $this->client
-            ]);
+            $this->dispatch('refresh');
         }
     }
 
@@ -192,34 +102,27 @@ class DeviceInfo extends Component
             'macSearch' => $this->macSearch
         ]);
 
-        $devices = $this->devices;
+        $query = Device::where('client', $this->client);
 
-        // Apply MAC search filter
         if ($this->macSearch) {
-            $devices = $devices->filter(function ($device) {
-                return stripos($device['macAddress'] ?? '', $this->macSearch) !== false;
-            });
+            $query->where('macAddress', 'like', '%' . $this->macSearch . '%');
         }
 
-        // Apply sorting
         if ($this->sortField === 'last_status') {
-            $devices = $devices->sortBy(function ($device) {
-                return isset($device['unixepoch']) && is_numeric($device['unixepoch']) ? $device['unixepoch'] : 0;
-            }, SORT_REGULAR, $this->sortDirection === 'desc');
+            $query->orderBy('unixepoch', $this->sortDirection);
         }
 
-        $currentPage = request()->query('page', 1);
-        $paginatedDevices = new \Illuminate\Pagination\LengthAwarePaginator(
-            $devices->forPage($currentPage, $this->perPage),
-            $devices->count(),
-            $this->perPage,
-            $currentPage,
-            ['path' => route('device-info')]
-        );
+        $paginatedDevices = $query->paginate($this->perPage);
+
+        if ($paginatedDevices->isEmpty() && $this->client) {
+            $this->error = 'No devices found for client: ' . $this->client;
+        } else {
+            $this->error = '';
+        }
 
         return view('livewire.device-info', [
             'paginatedDevices' => $paginatedDevices,
-            'totalDevices' => $devices->count(),
+            'totalDevices' => $paginatedDevices->total(),
             'timezone' => $this->timezone,
             'lastApiCall' => $this->lastApiCall
         ])->layout('layouts.app');

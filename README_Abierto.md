@@ -26,6 +26,8 @@ added crontab initiated event to load cache in docker need to run it by hand fro
 
 > $command->handle();
 
+
+
 Need to fix:
 - screen first needs to check cache if empty for all clients needs to call command to load it
 - large device issue display

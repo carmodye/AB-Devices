@@ -4,8 +4,8 @@
     <div class="mb-4 flex space-x-4">
         <!-- Client Selector -->
         <div class="flex-1">
-            <label for="client" class="block text-mm font-medium text-white">Select Client</label>
-            <select wire:model.live="client" id="client"
+            <label for="client" class="block text-sm font-bold text-gray-900">Select Client</label>
+            <select wire:model.debounce.500ms="client" id="client"
                 class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                 <option value="">Select a client</option>
                 @foreach ($clients as $client)
@@ -16,8 +16,8 @@
 
         <!-- Timezone Selector -->
         <div class="flex-1">
-            <label for="timezone" class="block font-medium text-mm text-white">Select Timezone</label>
-            <select wire:model.live="timezone" id="timezone"
+            <label for="timezone" class="block text-sm font-bold text-gray-900">Select Timezone</label>
+            <select wire:model.debounce.500ms="timezone" id="timezone"
                 class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                 <option value="America/New_York">Eastern (ET)</option>
                 <option value="America/Chicago">Central (CT)</option>
@@ -42,7 +42,7 @@
 
     <!-- MAC Search -->
     <div class="mb-4">
-        <label for="macSearch" class="block text-mm font-medium text-white">Search MAC Address</label>
+        <label for="macSearch" class="block text-sm font-bold text-gray-900">Search MAC Address</label>
         <input 
             wire:model.live.debounce.500ms="macSearch"
             id="macSearch"
@@ -54,7 +54,7 @@
 
     <!-- Last API Call Time -->
     @if ($lastApiCall)
-        <div class="mb-4 text-mm text-white">
+        <div class="mb-4 text-sm text-gray-600">
             Last API Call: {{ \Carbon\Carbon::parse($lastApiCall)->tz($timezone)->format('m/d/y h:i:s A') }}
         </div>
     @endif
@@ -120,6 +120,9 @@
                                     Screenshot</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Oopsscreen</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Last Reboot UTC</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -135,33 +138,36 @@
                             @foreach ($paginatedDevices as $device)
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device['client'] ?? 'N/A' }}</td>
+                                        {{ $device->client ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device['operatingSystem'] ?? 'N/A' }}</td>
+                                        {{ $device->operatingSystem ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device['macAddress'] ?? 'N/A' }}</td>
+                                        {{ $device->macAddress ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device['model'] ?? 'N/A' }}</td>
+                                        {{ $device->model ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device['firmwareVersion'] ?? 'N/A' }}</td>
+                                        {{ $device->firmwareVersion ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        @if (isset($device['screenshot']) && $device['screenshot'])
-                                            <a href="{{ $device['screenshot'] }}" target="_blank"
+                                        @if ($device->screenshot)
+                                            <a href="{{ $device->screenshot }}" target="_blank"
                                                 class="text-indigo-600 hover:text-indigo-900">View</a>
                                         @else
                                             N/A
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        @if (isset($device['lastreboot']) && $device['lastreboot'])
-                                            {{ \Carbon\Carbon::parse($device['lastreboot'])->format('y/m/d H:i') }}
+                                        {{ is_null($device->oopsscreen) ? 'N/A' : ($device->oopsscreen ? 'True' : 'False') }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        @if ($device->lastreboot)
+                                            {{ $device->lastreboot->format('y/m/d H:i') }}
                                         @else
                                             N/A
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        @if (isset($device['unixepoch']) && is_numeric($device['unixepoch']))
-                                            {{ \Carbon\Carbon::createFromTimestamp($device['unixepoch'])->tz($timezone)->format('m/d H:i:s') }}
+                                        @if ($device->unixepoch)
+                                            {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->tz($timezone)->format('m/d H:i:s') }}
                                         @else
                                             N/A
                                         @endif
@@ -183,4 +189,13 @@
             </div>
         @endif
     </div>
+
+    <!-- Livewire 3 Event Listener -->
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('refresh', () => {
+                console.log('Devices refreshed');
+            });
+        });
+    </script>
 </div>
