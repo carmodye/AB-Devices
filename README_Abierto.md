@@ -21,6 +21,9 @@ Configured to run in Docker with 3 images using sail
 
 added crontab initiated event to load cache in docker need to run it by hand from tinker
 
+run
+php artisan tinker
+then:
 > $command = new \App\Console\Commands\FetchDeviceData;
 = App\Console\Commands\FetchDeviceData {#5776}
 

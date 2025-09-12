@@ -156,7 +156,7 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ is_null($device->oopsscreen) ? 'N/A' : ($device->oopsscreen ? 'True' : 'False') }}
+                                        {{ $device->oopsscreen ?? 'N/A' }}</td>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         @if ($device->lastreboot)

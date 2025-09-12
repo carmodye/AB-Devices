@@ -12,7 +12,9 @@ class ClientSeeder extends Seeder
         Client::create(['name' => 'sheetz1']);
         Client::create(['name' => 'sheetz']);
         Client::create(['name' => 'ta']);
-        Client::create(['name' => 'qa1']);
+        Client::create(['name' => 'qa2']);
         Client::create(['name' => 'dev1']);
+        Client::create(['name' => 'rutters']);
+        Client::create(['name' => 'open']);
     }
 }

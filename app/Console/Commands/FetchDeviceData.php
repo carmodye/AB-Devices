@@ -18,7 +18,11 @@ class FetchDeviceData extends Command
     public function handle()
     {
         $client = $this->option('client');
-        $clients = $client ? [$client] : Client::pluck('name')->toArray();
+        if ($client === null) {
+            $clients = Client::pluck('name')->toArray();
+        } else {
+            $clients = [$client];
+        }
         Log::info('FetchDeviceData command started', ['clients' => $clients]);
 
         foreach ($clients as $client) {
@@ -53,7 +57,7 @@ class FetchDeviceData extends Command
                             'model' => $device['model'] ?? null,
                             'firmwareVersion' => $device['firmwareVersion'] ?? null,
                             'screenshot' => $device['screenshot'] ?? null,
-                            'oopsscreen' => isset($device['oopsscreen']) ? (bool) $device['oopsscreen'] : null,
+                            'oopsscreen' => $device['oopsscreen'] ?? null,
                             'lastreboot' => isset($device['lastreboot']) ? Carbon::parse($device['lastreboot']) : null,
                             'unixepoch' => $device['unixepoch'] ?? null,
                         ]);

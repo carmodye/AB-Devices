@@ -19,7 +19,6 @@ class Device extends Model
     ];
 
     protected $casts = [
-        'oopsscreen' => 'boolean',
         'lastreboot' => 'datetime',
     ];
 }

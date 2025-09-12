@@ -73,7 +73,6 @@ class DeviceInfo extends Component
         Log::info('Sorting updated', ['sortField' => $this->sortField, 'sortDirection' => $this->sortDirection]);
         $this->resetPage();
     }
-
     public function refreshDevices()
     {
         Log::info('refreshDevices called', ['client' => $this->client]);
