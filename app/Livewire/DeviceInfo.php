@@ -126,4 +126,11 @@ class DeviceInfo extends Component
             'lastApiCall' => $this->lastApiCall
         ])->layout('layouts.app');
     }
+function formatDeviceTimestamp($timestamp, $timezone) {
+    $timestamp = strlen($timestamp) > 10 ? intval($timestamp / 1000) : intval($timestamp);
+    return \Carbon\Carbon::createFromTimestampUTC($timestamp)
+        ->setTimezone($timezone)
+        ->format('Y/m/d H:i:s');
+}
+
 }

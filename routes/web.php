@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\FileUploader;
 use Illuminate\Support\Facades\Route;
 use App\Livewire\ShowNotes;
 use App\Livewire\CreateNote;
@@ -36,3 +37,4 @@ Route::get('/notes/edit/{note}', EditNote::class)
 
 
 Route::get('/device-info', DeviceInfo::class)->middleware(['auth'])->name('device-info');
+

@@ -1,0 +1,169 @@
+
+
+Install mysql client
+sudo apt install mysql-client-core-8.0
+
+
+
+ubuntu@ip-172-26-5-102:~$ cat setup1.txt
+sudo -R chown ubuntu:ubuntu /var/www
+
+
+cd /var/www
+
+git clone https://github.com/your-repo.git laravel-app
+cd laravel-app
+
+composer install
+
+sudo nano /etc/nginx/sites-available/laravel
+
+server { listen 80; server_name your-domain.com; root /var/www/laravel-app/public;
+    index index.php index.html index.htm; location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+    location ~ \.php$ { include snippets/fastcgi-php.conf; fastcgi_pass
+        unix:/var/run/php/php8.1-fpm.sock; fastcgi_param SCRIPT_FILENAME
+        $document_root$fastcgi_script_name; include fastcgi_params;
+    }
+}
+
+sudo ln -s /etc/nginx/sites-available/laravel /etc/nginx/sites-enabled/
+sudo systemctl restart nginx
+
+5. Set Up CI/CD with GitHub Actions
+
+- Create a .github/workflows/deploy.yml file in your repository:
+
+name: Deploy Laravel to AWS Lightsail
+
+on:
+
+  push:
+
+    branches:
+
+      - main
+
+jobs:
+
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+
+        uses: actions/checkout@v2
+
+
+      - name: SSH into Lightsail and deploy
+
+        uses: appleboy/ssh-action@master
+
+        with:
+
+          host: ${{ secrets.LIGHTSAIL_IP }}
+
+          username: ubuntu
+
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+          script: |
+
+            cd /var/www/laravel-app
+
+            git pull origin main
+
+            composer install
+
+            php artisan migrate --force
+
+            sudo systemctl restart nginx
+
+
+
+
+6. Secure the Server
+
+- Set correct permissions:
+
+sudo chown -R www-data:www-data /var/www/laravel-app
+
+sudo chmod -R 775 /var/www/laravel-app/storage
+
+- Enable SSL with Let's Encrypt:
+
+sudo apt install certbot python3-certbot-nginx -y
+
+sudo certbot --nginx -d your-domain.com
+
+
+
+7. Automate Deployment
+
+- Use AWS CodePipeline or GitHub Actions to trigger deployments automatically.
+
+- Ensure environment variables are correctly set in .env.
+
+For a detailed guide, check out this tutorial or this cheat sheet. Let me know if you need help with specific configurations! ����
+
+#
+https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-laravel-with-nginx-on-ubuntu-20-04
+
+
+
+#Static IP in lightsail needs to allow 443
+
+
+#Simple ci/cd crontab to pull
+#one time do
+
+cd /var/www/laravel-course
+git config --global --add safe.directory /var/www/laravel-course
+
+cd /var/www/laravel-course
+sudo -u www-data git pull origin main
+#
+#use crontab to pull every 5 minutes
+#mkdir for logs
+sudo chmod 755 /var/log/git_log/
+
+crontab -e
+#add
+*/5 * * * * cd /var/www/laravel-course && sudo -u www-data git pull origin main >> /var/log/git_log/git_pull.log 2>&1
+
+#git log file cleanup
+
+sudo nano /etc/logrotate.d/gitlog
+#add to file
+
+/var/log/git_log/git_pull.log {
+    hourly
+    rotate 0
+    size 1k
+    create 664 ubuntu ubuntu
+}
+
+
+
+copy dev env to .env
+sudo -u www-data .env_dev_ls .env
+
+
+install redis
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install Redis server
+sudo apt install redis -y
+
+# Enable Redis to start on boot
+sudo systemctl enable redis
+
+# Start Redis service
+sudo systemctl start redis
+
+# Check Redis status
+sudo systemctl status redis

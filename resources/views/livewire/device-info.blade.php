@@ -167,7 +167,9 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         @if ($device->unixepoch)
-                                            {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->tz($timezone)->format('m/d H:i:s') }}
+                                            {{-- {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->tz($timezone)->format('y/m/d H:i:s') }} --}}
+                                            {{-- {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->format('y/m/d H:i:s') }} --}}
+                                            {{ \App\Utils\TimestampFormatter::format($device->unixepoch, $timezone) }}
                                         @else
                                             N/A
                                         @endif
