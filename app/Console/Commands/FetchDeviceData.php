@@ -48,10 +48,11 @@ class FetchDeviceData extends Command
                     // Clear existing devices for the client
                     Device::where('client', $client)->delete();
 
-                    // Insert new devices
+                    // Prepare data for bulk insert
+                    $insertData = [];
                     foreach ($devices as $device) {
                         $unixepoch = $device['unixepoch'] ?? null;
-                        Device::create([
+                        $insertData[] = [
                             'client' => $device['client'] ?? $client,
                             'operatingSystem' => $device['operatingSystem'] ?? null,
                             'macAddress' => $device['macAddress'] ?? null,
@@ -63,7 +64,14 @@ class FetchDeviceData extends Command
                             'unixepoch' => $unixepoch,
                             'warning' => is_null($unixepoch) || ($now - $unixepoch > $warningThreshold),
                             'error' => is_null($unixepoch) || ($now - $unixepoch > $errorThreshold),
-                        ]);
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    }
+
+                    // Bulk insert in chunks of 500
+                    foreach (array_chunk($insertData, 500) as $chunk) {
+                        Device::insert($chunk);
                     }
 
                     Cache::put('devices_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
@@ -80,6 +88,8 @@ class FetchDeviceData extends Command
             }
         }
 
-        Log::info('FetchDeviceData command completed');
+        // Set unified last refresh time
+        Cache::put('devices_all_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
+        Log::info('FetchDeviceData command completed', ['last_refresh' => Cache::get('devices_all_last_api_call')]);
     }
 }

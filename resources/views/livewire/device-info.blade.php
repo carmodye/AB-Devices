@@ -4,7 +4,7 @@
     <div class="mb-4 flex space-x-4">
         <!-- Client Selector -->
         <div class="flex-1">
-            <label for="client" class="block text-sm font-bold text-gray-900">Select Client</label>
+            <label for="client" class="block text-lg font-bold text-white">Select Client</label>
             <select wire:model.debounce.500ms="client" id="client"
                 class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                 <option value="">Select a client</option>
@@ -16,7 +16,7 @@
 
         <!-- Timezone Selector -->
         <div class="flex-1">
-            <label for="timezone" class="block text-sm font-bold text-gray-900">Select Timezone</label>
+            <label for="timezone" class="block text-lg font-bold text-white">Select Timezone</label>
             <select wire:model.debounce.500ms="timezone" id="timezone"
                 class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                 <option value="America/New_York">Eastern (ET)</option>
@@ -42,7 +42,7 @@
 
     <!-- MAC Search -->
     <div class="mb-4">
-        <label for="macSearch" class="block text-sm font-bold text-gray-900">Search MAC Address</label>
+        <label for="macSearch" class="block text-lg font-bold text-white">Search MAC Address</label>
         <input 
             wire:model.live.debounce.500ms="macSearch"
             id="macSearch"
@@ -54,7 +54,7 @@
 
     <!-- Last API Call Time -->
     @if ($lastApiCall)
-        <div class="mb-4 text-sm text-gray-600">
+        <div class="mb-4 text-lg text-white">
             Last API Call: {{ \Carbon\Carbon::parse($lastApiCall)->tz($timezone)->format('m/d/y h:i:s A') }}
         </div>
     @endif

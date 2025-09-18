@@ -5,15 +5,37 @@ namespace App\Livewire;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\Device;
 
 class DeviceDashboard extends Component
 {
     public $clientsData = [];
+    public $lastRefreshTime;
 
     public function mount()
     {
         Log::info('DeviceDashboard mount called');
+        $this->updateLastRefreshTime();
+    }
+
+    public function refreshData()
+    {
+        Log::info('DeviceDashboard refreshData called');
+        try {
+            Artisan::call('devices:fetch');
+            Cache::forget('device_dashboard_clients'); // Clear cache to force new query
+            Log::info('Devices refreshed');
+            $this->updateLastRefreshTime();
+        } catch (\Exception $e) {
+            Log::error('Error refreshing devices', ['error' => $e->getMessage()]);
+            $this->lastRefreshTime = 'Error refreshing data';
+        }
+    }
+
+    protected function updateLastRefreshTime()
+    {
+        $this->lastRefreshTime = Cache::get('devices_all_last_api_call', 'Not yet refreshed');
     }
 
     public function render()
@@ -30,6 +52,9 @@ class DeviceDashboard extends Component
                 ->get()
                 ->toArray();
         });
+
+        // Update last refresh time
+        $this->updateLastRefreshTime();
 
         // Log queries executed
         Log::info('Queries executed', ['queries' => \DB::getQueryLog()]);
