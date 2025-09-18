@@ -9,11 +9,13 @@ class Kernel extends ConsoleKernel
 {
     protected $commands = [
         \App\Console\Commands\FetchDeviceData::class,
+        \App\Console\Commands\FetchDeviceDetails::class,
     ];
 
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('devices:fetch')->everyFiveMinutes();
+        $schedule->command('devices:fetch-details')->everyOddHour();
     }
 
     protected function commands()

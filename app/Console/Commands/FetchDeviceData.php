@@ -18,12 +18,12 @@ class FetchDeviceData extends Command
     public function handle()
     {
         $client = $this->option('client');
-        if ($client === null) {
-            $clients = Client::pluck('name')->toArray();
-        } else {
-            $clients = [$client];
-        }
+        $clients = $client ? [$client] : Client::pluck('name')->toArray();
         Log::info('FetchDeviceData command started', ['clients' => $clients]);
+
+        $warningThreshold = env('WARNING_THRESHOLD_MINUTES', 10) * 60 * 1000; // Convert to milliseconds
+        $errorThreshold = env('ERROR_THRESHOLD_MINUTES', 30) * 60 * 1000; // Convert to milliseconds
+        $now = now()->timestamp * 1000; // Current time in milliseconds
 
         foreach ($clients as $client) {
             try {
@@ -50,6 +50,7 @@ class FetchDeviceData extends Command
 
                     // Insert new devices
                     foreach ($devices as $device) {
+                        $unixepoch = $device['unixepoch'] ?? null;
                         Device::create([
                             'client' => $device['client'] ?? $client,
                             'operatingSystem' => $device['operatingSystem'] ?? null,
@@ -59,7 +60,9 @@ class FetchDeviceData extends Command
                             'screenshot' => $device['screenshot'] ?? null,
                             'oopsscreen' => $device['oopsscreen'] ?? null,
                             'lastreboot' => isset($device['lastreboot']) ? Carbon::parse($device['lastreboot']) : null,
-                            'unixepoch' => $device['unixepoch'] ?? null,
+                            'unixepoch' => $unixepoch,
+                            'warning' => is_null($unixepoch) || ($now - $unixepoch > $warningThreshold),
+                            'error' => is_null($unixepoch) || ($now - $unixepoch > $errorThreshold),
                         ]);
                     }
 

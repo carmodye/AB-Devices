@@ -16,9 +16,18 @@ class Device extends Model
         'oopsscreen',
         'lastreboot',
         'unixepoch',
+        'warning',
+        'error',
     ];
 
     protected $casts = [
         'lastreboot' => 'datetime',
+        'warning' => 'boolean',
+        'error' => 'boolean',
     ];
+
+    public function detail()
+    {
+        return $this->hasOne(DeviceDetail::class, 'macAddress', 'macAddress');
+    }
 }

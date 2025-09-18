@@ -439,3 +439,530 @@ Ensure the following are in place (from previous fixes):
   - Restart: `./vendor/bin/sail shell` and rerun the while loop.
 
 Test by visiting `/open-servers`, checking the grid, and confirming data refreshes. If issues arise, share logs, client count, or API response samples for further assistance!
+
+
+
+You're absolutely right—using SQL to perform the summarization for the `DeviceDetails` grid will be more efficient than using PHP/Laravel's query builder with `map` and multiple queries. By leveraging MySQL's aggregation functions (e.g., `COUNT`, `SUM`), we can compute `Total Devices`, `Total Devices with Warning`, and `Total Devices with Error` in a single query, reducing database load and improving performance, especially for large datasets (e.g., 3000 devices). This approach aligns with your goal of efficiency, as it minimizes PHP processing and lets MySQL handle the heavy lifting.
+
+We’ll update the `DeviceDetails` Livewire component to use a single SQL query with `GROUP BY client` and aggregation functions, while keeping the existing setup (`devices` table with `warning` and `error`, `FetchDeviceData`, `FetchDeviceDetails`, Laravel Sail, MySQL, and scheduler). The grid will continue to display `Client`, `Total Devices`, `Devices with Warning`, and `Devices with Error`, styled with Tailwind CSS.
+
+### Analysis
+
+- **Why SQL is Better**:
+  - **Performance**: A single `SELECT` with `GROUP BY` and aggregates (`COUNT`, `SUM`) is faster than multiple queries (`count()`, `where('warning', true)->count()`, etc.).
+  - **Scalability**: MySQL optimizes grouping and counting, reducing PHP memory usage for large datasets.
+  - **Simplicity**: One query replaces the `map` logic, making the code cleaner.
+
+- **Requirements**:
+  - Update `DeviceDetails` to use a SQL query:
+    - `SELECT client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count FROM devices GROUP BY client`.
+  - Keep the grid (`Client`, `Total Devices`, `Devices with Warning`, `Devices with Error`).
+  - Maintain `devices:fetch` and `devices:fetch-details` calls on render.
+  - Ensure compatibility with `DeviceInfo`, `FetchDeviceData` (populates `warning`, `error`), and `FetchDeviceDetails`.
+  - Use MySQL, Laravel Sail, and Tailwind CSS.
+
+- **Context**:
+  - **Tables**:
+    - `devices`: `client`, `macAddress`, `unixepoch`, `warning` (boolean), `error` (boolean), `oopsscreen` (string), etc.
+    - `device_details`: `macAddress`, `app_name`, `site_name`, etc., linked one-to-one with `devices`.
+  - **Commands**:
+    - `FetchDeviceData`: Uses `DEVICE_API_URL`, sets `warning` and `error` based on `unixepoch` and `.env` thresholds (`WARNING_THRESHOLD_MINUTES`, `ERROR_THRESHOLD_MINUTES`).
+    - `FetchDeviceDetails`: Calls `https://{client}.cms.ab-net.us/api/dumpdata`.
+  - **Scheduler**: Runs both commands every 5 minutes via Sail’s while loop.
+  - **Removed**: `OpenServers` component.
+  - **Current `DeviceDetails`**: Uses `map` with multiple queries, to be optimized.
+
+- **Assumptions**:
+  - `warning` and `error` are booleans (`true`/`false`), where `SUM(warning)` counts `true` values (MySQL treats `true` as `1`, `false` as `0`).
+  - No need for `device_details` data in the grid unless specified.
+  - Keep refresh logic (call both commands on render).
+
+- **Approach**:
+  - Update `DeviceDetails` to use a single SQL query with `groupBy` and `selectRaw`.
+  - Keep `device-details.blade.php` unchanged (already correct for the grid).
+  - Verify `FetchDeviceData`, `FetchDeviceDetails`, `.env`, and scheduler.
+  - Test in Sail with MySQL.
+
+### Solution
+
+#### 1. Update `DeviceDetails` Component
+
+Modify `app/Http/Livewire/DeviceDetails.php` to use a single SQL query for aggregation:
+
+```php
+<?php
+
+namespace App\Http\Livewire;
+
+use Livewire\Component;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Artisan;
+use App\Models\Device;
+
+class DeviceDetails extends Component
+{
+    public $clientsData = [];
+
+    public function mount()
+    {
+        Log::info('DeviceDetails mount called');
+        $this->refreshDetails();
+    }
+
+    public function refreshDetails()
+    {
+        Log::info('DeviceDetails refreshDetails called');
+        try {
+            Artisan::call('devices:fetch');
+            Artisan::call('devices:fetch-details');
+            Log::info('Devices and details refreshed');
+        } catch (\Exception $e) {
+            Log::error('Error refreshing devices', ['error' => $e->getMessage()]);
+        }
+    }
+
+    public function render()
+    {
+        Log::info('DeviceDetails render called');
+        $this->refreshDetails();
+
+        $this->clientsData = Device::groupBy('client')
+            ->selectRaw('client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count')
+            ->get()
+            ->toArray();
+
+        return view('livewire.device-details')
+            ->layout('layouts.app');
+    }
+}
+```
+
+**Changes**:
+- **Query**: Replaced `select('client')->groupBy('client')->get()->map(...)` with a single `groupBy('client')->selectRaw(...)`.
+  - `COUNT(*)`: Total devices per client.
+  - `SUM(warning)`: Counts devices where `warning = true` (MySQL: `true = 1`, `false = 0`).
+  - `SUM(error)`: Counts devices where `error = true`.
+- **Performance**: Single query reduces database round-trips.
+- **Data Structure**: `$clientsData` remains compatible with the view (array of `[client, total_devices, warning_count, error_count]`).
+
+#### 2. Verify `device-details` View
+
+The view (`resources/views/livewire/device-details.blade.php`) is already correct:
+
+```php
+<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <h1 class="text-2xl font-semibold text-gray-900 mb-6">Device Status by Client</h1>
+
+    <div class="relative">
+        <div wire:loading class="absolute inset-0 flex justify-center items-center bg-gray-100 bg-opacity-75 z-10">
+            <svg class="animate-spin h-8 w-8 text-indigo-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="text-gray-600 text-base font-medium">Loading client data...</span>
+        </div>
+
+        <style>
+            .animate-spin-fallback {
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        </style>
+
+        @if (empty($clientsData))
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span class="block sm:inline">No clients available.</span>
+            </div>
+        @else
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div class="px-4 py-5 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Client Device Status</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Devices</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Devices with Warning</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Devices with Error</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach ($clientsData as $client)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{{ $client['client'] }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $client['total_devices'] }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $client['warning_count'] }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $client['error_count'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+    </div>
+</div>
+```
+
+#### 3. Verify `FetchDeviceData` Command
+
+Ensure `app/Console/Commands/FetchDeviceData.php` populates `warning` and `error`:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use App\Models\Client;
+use App\Models\Device;
+use Carbon\Carbon;
+
+class FetchDeviceData extends Command
+{
+    protected $signature = 'devices:fetch {--client=}';
+    protected $description = 'Fetch device data for all clients or a specific client and store in database';
+
+    public function handle()
+    {
+        $client = $this->option('client');
+        $clients = $client ? [$client] : Client::pluck('name')->toArray();
+        Log::info('FetchDeviceData command started', ['clients' => $clients]);
+
+        $warningThreshold = env('WARNING_THRESHOLD_MINUTES', 10) * 60 * 1000; // Convert to milliseconds
+        $errorThreshold = env('ERROR_THRESHOLD_MINUTES', 30) * 60 * 1000; // Convert to milliseconds
+        $now = now()->timestamp * 1000; // Current time in milliseconds
+
+        foreach ($clients as $client) {
+            try {
+                $url = env('DEVICE_API_URL');
+                if (!$url) {
+                    Log::error('DEVICE_API_URL not set', ['client' => $client]);
+                    throw new \Exception('API URL not configured');
+                }
+                $response = Http::timeout(10)->get($url, ['client' => $client]);
+                Log::info('API Response', [
+                    'client' => $client,
+                    'url' => $url . '?client=' . $client,
+                    'status' => $response->status(),
+                    'body_size' => strlen($response->body()) / 1024 / 1024 . 'MB',
+                    'device_count' => is_array($response->json()) ? count($response->json()) : 0
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $devices = is_array($data) ? $data : [];
+
+                    // Clear existing devices for the client
+                    Device::where('client', $client)->delete();
+
+                    // Insert new devices
+                    foreach ($devices as $device) {
+                        $unixepoch = $device['unixepoch'] ?? null;
+                        Device::create([
+                            'client' => $device['client'] ?? $client,
+                            'operatingSystem' => $device['operatingSystem'] ?? null,
+                            'macAddress' => $device['macAddress'] ?? null,
+                            'model' => $device['model'] ?? null,
+                            'firmwareVersion' => $device['firmwareVersion'] ?? null,
+                            'screenshot' => $device['screenshot'] ?? null,
+                            'oopsscreen' => $device['oopsscreen'] ?? null,
+                            'lastreboot' => isset($device['lastreboot']) ? Carbon::parse($device['lastreboot']) : null,
+                            'unixepoch' => $unixepoch,
+                            'warning' => is_null($unixepoch) || ($now - $unixepoch > $warningThreshold),
+                            'error' => is_null($unixepoch) || ($now - $unixepoch > $errorThreshold),
+                        ]);
+                    }
+
+                    Cache::put('devices_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
+                    Log::info('Devices stored for client', ['client' => $client, 'count' => count($devices)]);
+                } else {
+                    Log::error('API request failed', ['client' => $client, 'status' => $response->status()]);
+                    throw new \Exception('API request failed with status: ' . $response->status());
+                }
+            } catch (\Exception $e) {
+                Log::error('Error fetching devices for client', [
+                    'client' => $client,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        Log::info('FetchDeviceData command completed');
+    }
+}
+```
+
+#### 4. Verify `FetchDeviceDetails` Command
+
+Ensure `app/Console/Commands/FetchDeviceDetails.php` is correct:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use App\Models\Client;
+use App\Models\Device;
+use App\Models\DeviceDetail;
+
+class FetchDeviceDetails extends Command
+{
+    protected $signature = 'devices:fetch-details {--client=}';
+    protected $description = 'Fetch device details from CMS API and store in database';
+
+    public function handle()
+    {
+        $client = $this->option('client');
+        $clients = $client ? [$client] : Client::pluck('name')->toArray();
+        Log::info('FetchDeviceDetails command started', ['clients' => $clients]);
+
+        foreach ($clients as $client) {
+            try {
+                $url = "https://{$client}.cms.ab-net.us/api/dumpdata";
+                $response = Http::timeout(10)->get($url);
+                Log::info('API Response', [
+                    'client' => $client,
+                    'url' => $url,
+                    'status' => $response->status(),
+                    'body_size' => strlen($response->body()) / 1024 / 1024 . 'MB',
+                    'device_count' => is_array($response->json('devices')) ? count($response->json('devices')) : 0
+                ]);
+
+                if ($response->successful()) {
+                    $devices = $response->json('devices', []);
+
+                    // Clear existing details for the client's devices
+                    DeviceDetail::whereIn('macAddress', Device::where('client', $client)->pluck('macAddress'))->delete();
+
+                    // Insert new details
+                    foreach ($devices as $device) {
+                        DeviceDetail::create([
+                            'macAddress' => $device['device_macaddress'] ?? null,
+                            'display_id' => $device['display_id'] ?? null,
+                            'display_name' => $device['display_name'] ?? null,
+                            'device_id' => $device['device_id'] ?? null,
+                            'device_name' => $device['device_name'] ?? null,
+                            'device_version' => $device['device_version'] ?? null,
+                            'site_id' => $device['site_id'] ?? null,
+                            'site_name' => $device['site_name'] ?? null,
+                            'app_geometry' => $device['app_geometry'] ?? null,
+                            'app_id' => $device['app_id'] ?? null,
+                            'app_name' => $device['app_name'] ?? null,
+                            'app_package' => $device['app_package'] ?? null,
+                            'app_version' => $device['app_version'] ?? null,
+                            'ip_address' => $device['ip_address'] ?? null,
+                            'user_id' => $device['user_id'] ?? null,
+                            'user_name' => $device['user_name'] ?? null,
+                            'display_info' => isset($device['display_info']) ? json_encode($device['display_info']) : null,
+                        ]);
+                    }
+
+                    Cache::put('device_details_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
+                    Log::info('Device details stored for client', ['client' => $client, 'count' => count($devices)]);
+                } else {
+                    Log::error('API request failed', ['client' => $client, 'status' => $response->status()]);
+                    throw new \Exception('API request failed with status: ' . $response->status());
+                }
+            } catch (\Exception $e) {
+                Log::error('Error fetching device details for client', [
+                    'client' => $client,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        Log::info('FetchDeviceDetails command completed');
+    }
+}
+```
+
+#### 5. Verify `.env`
+
+Ensure `.env` has:
+
+```env
+DEVICE_API_URL=https://mg50v8oyx1.execute-api.us-east-1.amazonaws.com/Prod/data
+WARNING_THRESHOLD_MINUTES=10
+ERROR_THRESHOLD_MINUTES=30
+```
+
+Clear cache:
+
+```bash
+./vendor/bin/sail artisan config:clear
+./vendor/bin/sail artisan config:cache
+```
+
+Verify:
+
+```bash
+./vendor/bin/sail artisan tinker
+>>> env('WARNING_THRESHOLD_MINUTES')
+=> "10"
+>>> env('ERROR_THRESHOLD_MINUTES')
+=> "30"
+```
+
+#### 6. Verify Scheduler
+
+Ensure `app/Console/Kernel.php`:
+
+```php
+<?php
+
+namespace App\Console;
+
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+
+class Kernel extends ConsoleKernel
+{
+    protected function schedule(Schedule $schedule)
+    {
+        $schedule->command('devices:fetch')->everyFiveMinutes();
+        $schedule->command('devices:fetch-details')->everyFiveMinutes();
+    }
+
+    protected function commands()
+    {
+        $this->load(__DIR__'/Commands');
+        require base_path('routes/console.php');
+    }
+}
+```
+
+Check Sail while loop:
+
+```bash
+./vendor/bin/sail shell
+ps aux | grep schedule:run
+# If not running:
+nohup while true; do php artisan schedule:run; sleep 60; done > /dev/null 2>&1 &
+```
+
+#### 7. Test the Setup
+
+1. **Run Commands**:
+   ```bash
+   ./vendor/bin/sail artisan devices:fetch
+   ./vendor/bin/sail artisan devices:fetch-details
+   ```
+   Check logs (`storage/logs/laravel.log`):
+   ```
+   [2025-09-18 10:22:00] local.INFO: FetchDeviceData command started {"clients":["ta","dev1"]}
+   [2025-09-18 10:22:00] local.INFO: Devices stored for client {"client":"ta","count":50}
+   [2025-09-18 10:22:00] local.INFO: FetchDeviceDetails command started {"clients":["ta","dev1"]}
+   [2025-09-18 10:22:00] local.INFO: Device details stored for client {"client":"ta","count":50}
+   ```
+
+2. **Test SQL Query**:
+   ```bash
+   ./vendor/bin/sail artisan tinker
+   >>> App\Models\Device::groupBy('client')->selectRaw('client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count')->get()->toArray()
+   ```
+   Example:
+   ```php
+   [
+       [
+           'client' => 'ta',
+           'total_devices' => 50,
+           'warning_count' => 5,
+           'error_count' => 2
+       ],
+       [
+           'client' => 'dev1',
+           'total_devices' => 30,
+           'warning_count' => 3,
+           'error_count' => 1
+       ]
+   ]
+   ```
+
+3. **Test `DeviceDetails`**:
+   - Visit `/device-details` (ensure route exists in `routes/web.php`):
+     ```php
+     Route::get('/device-details', DeviceDetails::class)->name('device-details');
+     ```
+   - Confirm grid shows `Client`, `Total Devices`, `Devices with Warning`, `Devices with Error`.
+   - Check logs for `Devices and details refreshed`.
+
+4. **Test Scheduler**:
+   Wait 5 minutes, check logs for `FetchDeviceData command started` and `FetchDeviceDetails command started`.
+
+#### 8. Performance Considerations
+
+- **Indexing**: Ensure `client`, `warning`, `error` are indexed:
+  ```php
+  // In a new migration
+  Schema::table('devices', function (Blueprint $table) {
+      $table->index(['client', 'warning', 'error']);
+  });
+  ```
+  Run:
+  ```bash
+  ./vendor/bin/sail artisan migrate
+  ```
+
+- **Caching**: Cache results to reduce database load:
+  ```php
+  $this->clientsData = Cache::remember('device_details_clients', now()->addMinutes(5), function () {
+      return Device::groupBy('client')
+          ->selectRaw('client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count')
+          ->get()
+          ->toArray();
+  });
+  ```
+
+- **Large Datasets**: The SQL query is optimized, but for thousands of clients, consider pagination:
+  ```php
+  use Livewire\WithPagination;
+
+  class DeviceDetails extends Component
+  {
+      use WithPagination;
+      public $clientsData = [];
+
+      public function render()
+      {
+          $this->refreshDetails();
+          $this->clientsData = Device::groupBy('client')
+              ->selectRaw('client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count')
+              ->paginate(10);
+          return view('livewire.device-details')->layout('layouts.app');
+      }
+  }
+  ```
+
+#### 9. Troubleshooting
+
+- **No Data**:
+  - Verify `devices` table: `App\Models\Device::count()`.
+  - Check `clients`: `App\Models\Client::pluck('name')`.
+
+- **API Issues**:
+  - Test: `curl "https://mg50v8oyx1.execute-api.us-east-1.amazonaws.com/Prod/data?client=ta"`.
+  - Test: `curl "https://ta.cms.ab-net.us/api/dumpdata"`.
+
+- **Incorrect Counts**:
+  - Verify `warning`/`error`:
+    ```php
+    >>> App\Models\Device::where('client', 'ta')->get(['macAddress', 'unixepoch', 'warning', 'error'])->toArray()
+    ```
+
+- **Logs**:
+  - Share `storage/logs/laravel.log` after running commands or visiting `/device-details`.
+
+Test by running `devices:fetch` and visiting `/device-details`. If you want to add fields from `device_details` (e.g., `app_name`) or features (e.g., sorting, filtering by client), let me know!
