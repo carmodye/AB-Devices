@@ -1,114 +1,94 @@
-<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-    <h1 class="text-2xl font-semibold text-gray-900 mb-6">Device Information</h1>
-
-    <div class="mb-4 flex space-x-4">
-        <!-- Client Selector -->
-        <div class="flex-1">
-            <label for="client" class="block text-lg font-bold text-white">Select Client</label>
-            <select wire:model.debounce.500ms="client" id="client"
-                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                <option value="">Select a client</option>
-                @foreach ($clients as $client)
-                    <option value="{{ $client }}">{{ $client }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Timezone Selector -->
-        <div class="flex-1">
-            <label for="timezone" class="block text-lg font-bold text-white">Select Timezone</label>
-            <select wire:model.debounce.500ms="timezone" id="timezone"
-                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                <option value="America/New_York">Eastern (ET)</option>
-                <option value="America/Chicago">Central (CT)</option>
-                <option value="America/Denver">Mountain (MT)</option>
-                <option value="America/Phoenix">Arizona (MST)</option>
-                <option value="America/Los_Angeles">Pacific (PT)</option>
-                <option value="America/Anchorage">Alaska (AKT)</option>
-                <option value="Pacific/Honolulu">Hawaii (HST)</option>
-            </select>
-        </div>
-
-        <!-- Refresh Button -->
-        <div class="flex items-end">
-            <button 
-                wire:click="refreshDevices"
-                class="mt-1 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
+<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8" wire:poll.300s>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-semibold text-gray-900">Device Info for {{ $client }}</h1>
+        <div class="flex items-center space-x-4 bg-white px-4 py-2 rounded-md shadow-sm">
+            <span class="text-sm font-medium text-gray-900">Last refreshed: {{ $lastApiCall }}</span>
+            <button wire:click="refreshDevices"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
                 Refresh
             </button>
         </div>
     </div>
 
-    <!-- MAC Search -->
     <div class="mb-4">
-        <label for="macSearch" class="block text-lg font-bold text-white">Search MAC Address</label>
-        <input 
-            wire:model.live.debounce.500ms="macSearch"
-            id="macSearch"
-            type="text"
-            placeholder="Enter MAC Address (e.g., 00:1A:2B)"
-            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-        >
+        <div class="flex space-x-4">
+            <div class="w-1/3">
+                <label for="client" class="block text-lg font-medium text-white">Select Client</label>
+                <select wire:model.live="client" id="client"
+                    class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="">Select a client</option>
+                    @foreach ($clients as $clientName)
+                        <option value="{{ $clientName }}">{{ $clientName }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="w-1/3">
+                <label for="macSearch" class="block text-lg font-medium text-white">Search MAC Address</label>
+                <input wire:model.live="macSearch" id="macSearch" type="text"
+                    class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Enter MAC address">
+            </div>
+        </div>
     </div>
 
-    <!-- Last API Call Time -->
-    @if ($lastApiCall)
-        <div class="mb-4 text-lg text-white">
-            Last API Call: {{ \Carbon\Carbon::parse($lastApiCall)->tz($timezone)->format('m/d/y h:i:s A') }}
+    @if ($error)
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">{{ $error }}</span>
         </div>
     @endif
 
     <div class="relative">
-        <!-- Loading Indicator Overlay -->
         <div wire:loading class="absolute inset-0 flex justify-center items-center bg-gray-100 bg-opacity-75 z-10">
             <svg class="animate-spin h-8 w-8 text-indigo-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none"
                 viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <span class="text-gray-600 text-base font-medium">Loading devices...</span>
+            <span class="text-gray-600 text-base font-medium">Loading device data...</span>
         </div>
 
-        <!-- Fallback CSS for Animation -->
         <style>
             .animate-spin-fallback {
                 animation: spin 1s linear infinite;
             }
+
             @keyframes spin {
                 from {
                     transform: rotate(0deg);
                 }
+
                 to {
                     transform: rotate(360deg);
                 }
             }
         </style>
 
-        @if ($error)
+        @if ($paginatedDevices->isEmpty())
             <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span class="block sm:inline">{{ $error }}</span>
+                <span class="block sm:inline">No device data available for {{ $client }}.</span>
             </div>
-        @endif
-
-        @if ($paginatedDevices->count() > 0)
+        @else
             <div class="bg-white shadow overflow-hidden sm:rounded-lg">
                 <div class="px-4 py-5 sm:px-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">Device List ({{ $totalDevices }} Total)</h3>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Device Details for {{ $client }} (Total:
+                        {{ $totalDevices }})</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Client</th>
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                    wire:click="sortBy('macAddress')">MAC Address @if ($sortField === 'macAddress')
+                                    <span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span> @endif</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Operating System</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    MAC</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Model</th>
@@ -120,31 +100,28 @@
                                     Screenshot</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Oopsscreen</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Last Reboot UTC</th>
+                                    Oops Screen</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                    wire:click="sortBy('last_status')">
-                                    Last Status
-                                    @if ($sortField === 'last_status')
-                                        <span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
-                                    @endif
-                                </th>
+                                    wire:click="sortBy('last_status')">Last Status @if ($sortField === 'last_status')
+                                    <span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span> @endif</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Warning</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Error</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @foreach ($paginatedDevices as $device)
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device->client ?? 'N/A' }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device->operatingSystem ?? 'N/A' }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                                         {{ $device->macAddress ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device->model ?? 'N/A' }}</td>
+                                        {{ $device->operatingSystem ?? 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $device->model ?? 'N/A' }}
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ $device->firmwareVersion ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -156,48 +133,28 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $device->oopsscreen ?? 'N/A' }}</td>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        @if ($device->lastreboot)
-                                            {{ $device->lastreboot->format('y/m/d H:i') }}
+                                        @if ($device->oopsscreen)
+                                            <a href="{{ $device->oopsscreen }}" target="_blank"
+                                                class="text-indigo-600 hover:text-indigo-900">View</a>
                                         @else
                                             N/A
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        @if ($device->unixepoch)
-                                            {{-- {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->tz($timezone)->format('y/m/d H:i:s') }} --}}
-                                            {{-- {{ \Carbon\Carbon::createFromTimestamp($device->unixepoch)->format('y/m/d H:i:s') }} --}}
-                                            {{ \App\Utils\TimestampFormatter::format($device->unixepoch, $timezone) }}
-                                        @else
-                                            N/A
-                                        @endif
-                                    </td>
+                                        {{ $device->lastreboot ? $device->lastreboot : 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ $device->warning ? 'Yes' : 'No' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ $device->error ? 'Yes' : 'No' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <!-- Pagination Links -->
-            <div class="mt-4">
-                {{ $paginatedDevices->links() }}
-            </div>
-        @else
-            <div class="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span class="block sm:inline">No devices available. Please select a client.</span>
+                <div class="px-4 py-3 bg-white sm:px-6">
+                    {{ $paginatedDevices->links() }}
+                </div>
             </div>
         @endif
     </div>
-
-    <!-- Livewire 3 Event Listener -->
-    <script>
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.on('refresh', () => {
-                console.log('Devices refreshed');
-            });
-        });
-    </script>
 </div>

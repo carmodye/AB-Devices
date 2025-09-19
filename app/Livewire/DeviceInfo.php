@@ -6,9 +6,9 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\Client;
 use App\Models\Device;
-use Carbon\Carbon;
 
 class DeviceInfo extends Component
 {
@@ -18,13 +18,13 @@ class DeviceInfo extends Component
     public $clients = [];
     public $error = '';
     public $perPage = 50;
-    public $timezone = 'America/New_York';
     public $lastApiCall = null;
     public $sortField = 'last_status';
     public $sortDirection = 'desc';
     public $macSearch = '';
 
     protected $paginationTheme = 'tailwind';
+    protected $listeners = ['refresh' => '$refresh'];
 
     public function mount()
     {
@@ -50,12 +50,6 @@ class DeviceInfo extends Component
         }
     }
 
-    public function updatedTimezone($value)
-    {
-        Log::info('Timezone updated', ['timezone' => $value]);
-        $this->loadLastApiCall();
-    }
-
     public function updatedMacSearch()
     {
         Log::info('MAC search updated', ['macSearch' => $this->macSearch]);
@@ -73,12 +67,14 @@ class DeviceInfo extends Component
         Log::info('Sorting updated', ['sortField' => $this->sortField, 'sortDirection' => $this->sortDirection]);
         $this->resetPage();
     }
+
     public function refreshDevices()
     {
         Log::info('refreshDevices called', ['client' => $this->client]);
         if ($this->client) {
             Cache::forget('devices_' . $this->client . '_last_api_call');
-            \Artisan::call('devices:fetch', ['--client' => $this->client]);
+            Cache::forget('device_info_' . $this->client);
+            Artisan::call('devices:fetch', ['--client' => $this->client]);
             $this->loadLastApiCall();
             $this->dispatch('refresh');
         }
@@ -87,7 +83,7 @@ class DeviceInfo extends Component
     public function loadLastApiCall()
     {
         $cacheKey = 'devices_' . $this->client . '_last_api_call';
-        $this->lastApiCall = Cache::get($cacheKey);
+        $this->lastApiCall = Cache::get($cacheKey, 'Not yet refreshed');
         Log::info('Last API call loaded', ['client' => $this->client, 'last_api_call' => $this->lastApiCall]);
     }
 
@@ -111,7 +107,9 @@ class DeviceInfo extends Component
             $query->orderBy('unixepoch', $this->sortDirection);
         }
 
-        $paginatedDevices = $query->paginate($this->perPage);
+        $paginatedDevices = Cache::remember('device_info_' . $this->client . '_page_' . request()->query('page', 1), now()->addMinutes(5), function () use ($query) {
+            return $query->paginate($this->perPage);
+        });
 
         if ($paginatedDevices->isEmpty() && $this->client) {
             $this->error = 'No devices found for client: ' . $this->client;
@@ -122,15 +120,7 @@ class DeviceInfo extends Component
         return view('livewire.device-info', [
             'paginatedDevices' => $paginatedDevices,
             'totalDevices' => $paginatedDevices->total(),
-            'timezone' => $this->timezone,
             'lastApiCall' => $this->lastApiCall
         ])->layout('layouts.app');
     }
-function formatDeviceTimestamp($timestamp, $timezone) {
-    $timestamp = strlen($timestamp) > 10 ? intval($timestamp / 1000) : intval($timestamp);
-    return \Carbon\Carbon::createFromTimestampUTC($timestamp)
-        ->setTimezone($timezone)
-        ->format('Y/m/d H:i:s');
-}
-
 }
