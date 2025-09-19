@@ -13,6 +13,8 @@ class DeviceDashboard extends Component
     public $clientsData = [];
     public $lastRefreshTime;
 
+    protected $listeners = ['refresh' => '$refresh'];
+
     public function mount()
     {
         Log::info('DeviceDashboard mount called');
@@ -24,7 +26,7 @@ class DeviceDashboard extends Component
         Log::info('DeviceDashboard refreshData called');
         try {
             Artisan::call('devices:fetch');
-            Cache::forget('device_dashboard_clients'); // Clear cache to force new query
+            Cache::forget('device_dashboard_clients');
             Log::info('Devices refreshed');
             $this->updateLastRefreshTime();
         } catch (\Exception $e) {
@@ -41,25 +43,16 @@ class DeviceDashboard extends Component
     public function render()
     {
         Log::info('DeviceDashboard render called');
-
-        // Enable query logging for debugging
         \DB::enableQueryLog();
-
-        // Cache the query results for 5 minutes
         $this->clientsData = Cache::remember('device_dashboard_clients', now()->addMinutes(5), function () {
             return Device::groupBy('client')
                 ->selectRaw('client, COUNT(*) as total_devices, SUM(warning) as warning_count, SUM(error) as error_count')
                 ->get()
                 ->toArray();
         });
-
-        // Update last refresh time
         $this->updateLastRefreshTime();
-
-        // Log queries executed
         Log::info('Queries executed', ['queries' => \DB::getQueryLog()]);
         \DB::disableQueryLog();
-
         return view('livewire.device-dashboard')
             ->layout('layouts.app');
     }
