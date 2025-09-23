@@ -1,13 +1,11 @@
 <?php
 
-use App\Livewire\FileUploader;
-use Illuminate\Support\Facades\Route;
-use App\Livewire\ShowNotes;
 use App\Livewire\CreateNote;
-use App\Livewire\EditNote;
-use App\Livewire\DeviceInfo;
-use App\Livewire\DeviceDetails;
 use App\Livewire\DeviceDashboard;
+use App\Livewire\DeviceInfo;
+use App\Livewire\EditNote;
+use App\Livewire\ShowNotes;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -23,11 +21,9 @@ Route::middleware([
     })->name('dashboard');
 });
 
-
 Route::get('/notes', ShowNotes::class)
     ->middleware(['auth', 'verified'])
     ->name('notes.index');
-
 
 Route::get('/notes/create', CreateNote::class)
     ->middleware(['auth', 'verified'])
@@ -37,10 +33,9 @@ Route::get('/notes/edit/{note}', EditNote::class)
     ->middleware(['auth', 'verified'])
     ->name('notes.edit');
 
-
 Route::get('/device-info', DeviceInfo::class)
-->middleware(['auth', 'verified'])
-->name('device-info');
+    ->middleware(['auth', 'verified'])
+    ->name('device-info');
 
 Route::get('/device-dashboard', DeviceDashboard::class)
     ->middleware(['auth', 'verified'])

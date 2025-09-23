@@ -1,3 +1,7 @@
+install pagination
+php artisan livewire:publish --pagination
+
+
 Base project using 
 - laravel jetstream with livewire and tailwind 
 - simple CRUD with notes

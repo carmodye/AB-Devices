@@ -1,0 +1,9 @@
+use Illuminate\Support\Facades\Redis;
+
+$redis = Redis::connection('cache');
+$redis->keys('*client_devices*');  // Should show "cache:client_devices:sheetz1"
+$redis->smembers('client_devices:sheetz1');  // Should list MACs
+
+
+$rawClient = $redis->client();
+

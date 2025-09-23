@@ -2,165 +2,175 @@
 
 namespace App\Livewire;
 
+use App\Models\Client;
+use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Artisan;
-use App\Models\Client;
-use App\Models\Device;
 
 class DeviceInfo extends Component
 {
     use WithPagination;
 
-    public $client = '';
-    public $clients = [];
-    public $error = '';
-    public $perPage = 50;
-    public $lastApiCall = null;
-    public $sortField = 'last_status';
-    public $sortDirection = 'desc';
-    public $macSearch = '';
-    public $filter = ''; // '' for all, 'warning' for warning-only, 'error' for error-only
-    public $warningCount = 0;
-    public $errorCount = 0;
+    public $selectedClient = ''; // Default to no client
+    public $clients;
+    public $allDevices = []; // Serializable array of all devices for this client
+    public $loading = false;
+    public $sortField = 'macAddress'; // Default sort field
+    public $sortDirection = 'asc'; // Default sort direction
 
-    protected $paginationTheme = 'tailwind';
-    protected $listeners = ['refresh' => '$refresh'];
-
-    public function mount()
-    {
-        Log::info('Mount called', ['client' => $this->client]);
-        $this->clients = Client::pluck('name')->toArray();
-        $this->client = !empty($this->clients) ? $this->clients[0] : '';
-        if ($this->client) {
-            $this->loadLastApiCall();
-            $this->updateCounts();
-        }
-    }
-
-    public function updatedClient($value)
-    {
-        Log::info('updatedClient called', ['client' => $value, 'previous_client' => $this->client]);
-        $this->client = $value;
-        $this->macSearch = '';
-        $this->filter = '';
-        $this->resetPage();
-        if ($this->client) {
-            $this->loadLastApiCall();
-            $this->updateCounts();
-        } else {
-            $this->error = 'Please select a client';
-            $this->lastApiCall = null;
-            $this->warningCount = 0;
-            $this->errorCount = 0;
-        }
-    }
-
-    public function updatedMacSearch()
-    {
-        Log::info('MAC search updated', ['macSearch' => $this->macSearch]);
-        $this->resetPage();
-    }
+    // Define query string parameters to persist state in URL
+    protected $queryString = [
+        'page' => ['except' => 1],
+        'sortField' => ['except' => 'macAddress'],
+        'sortDirection' => ['except' => 'asc'],
+        'selectedClient' => ['except' => ''], // Persist selected client
+    ];
 
     public function sortBy($field)
     {
         if ($this->sortField === $field) {
+            // Toggle direction if clicking the same field
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
+            // Set new sort field and default to ascending
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        Log::info('Sorting updated', ['sortField' => $this->sortField, 'sortDirection' => $this->sortDirection]);
+
+        // Reset pagination to page 1 when sorting
         $this->resetPage();
     }
 
-    public function refreshDevices()
+    public function mount()
     {
-        Log::info('refreshDevices called', ['client' => $this->client]);
-        if ($this->client) {
-            Cache::forget('devices_' . $this->client . '_last_api_call');
-            Cache::forget('device_info_' . $this->client);
-            Artisan::call('devices:fetch', ['--client' => $this->client]);
-            $this->loadLastApiCall();
-            $this->updateCounts();
-            $this->dispatch('refresh');
+        $this->clients = Client::pluck('name', 'name')->toArray(); // From DB
+        $this->selectedClient = array_key_first($this->clients) ?? ''; // Auto-select first if available
+        Log::info('Component mounted', ['selectedClient' => $this->selectedClient, 'clients' => $this->clients]);
+        if (!empty($this->selectedClient)) {
+            $this->loadDevices();
         }
     }
 
-    public function filterBy($type)
+    public function updatedSelectedClient($value)
     {
-        Log::info('filterBy called', ['type' => $type, 'client' => $this->client]);
-        $this->filter = $this->filter === $type ? '' : $type; // Toggle filter
-        $this->macSearch = '';
-        $this->resetPage();
+        Log::info('updatedSelectedClient triggered', ['new_value' => $value]);
+        $this->resetPage(); // Reset pagination when client changes
+        $this->loadDevices(); // Reloads allDevices; pagination handled in render
     }
 
-    public function loadLastApiCall()
+    public function refreshData()
     {
-        $cacheKey = 'devices_' . $this->client . '_last_api_call';
-        $this->lastApiCall = Cache::get($cacheKey, 'Not yet refreshed');
-        Log::info('Last API call loaded', ['client' => $this->client, 'last_api_call' => $this->lastApiCall]);
+        if (empty($this->selectedClient)) {
+            return;
+        }
+
+        $this->loading = true;
+
+        // Run the artisan command to refresh API data for the selected client
+        Artisan::call('devices:fetch --client=' . $this->selectedClient);
+
+        // Reload devices from Redis
+        $this->loadDevices();
+
+        $this->loading = false;
     }
 
-    public function updateCounts()
+    public function manualLoad()
     {
-        $this->warningCount = Cache::remember('device_info_' . $this->client . '_warning_count', now()->addMinutes(5), function () {
-            return Device::where('client', $this->client)->where('warning', 1)->count();
-        });
-        $this->errorCount = Cache::remember('device_info_' . $this->client . '_error_count', now()->addMinutes(5), function () {
-            return Device::where('client', $this->client)->where('error', 1)->count();
-        });
-        Log::info('Counts updated', ['client' => $this->client, 'warningCount' => $this->warningCount, 'errorCount' => $this->errorCount]);
+        Log::info('manualLoad called', ['selectedClient' => $this->selectedClient]);
+        $this->loadDevices();
+    }
+
+    public function loadDevices()
+    {
+        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient]);
+        if (empty($this->selectedClient)) {
+            $this->allDevices = [];
+            Log::info('loadDevices: Client empty, setting allDevices to []');
+            return;
+        }
+
+        $redis = Redis::connection('cache');
+        $clientKey = "devices:{$this->selectedClient}"; // Bare key
+        Log::info('Redis key', ['clientKey' => $clientKey]);
+
+        $fullKey = $clientKey; // Full key for raw get
+        Log::info('Full Redis key', ['fullKey' => $fullKey]);
+
+        $rawClient = $redis->client(); // Raw phpredis client
+        $rawData = $rawClient->get($fullKey); // Get with full key, no additional prefix
+        Log::info('Redis raw data', ['rawData' => substr($rawData ?? '', 0, 100)]);
+
+        Log::info('Redis raw get result', [
+            'full_key' => $fullKey,
+            'rawData_length' => strlen($rawData ?? ''),
+            'is_null' => is_null($rawData),
+            'rawData_preview' => substr($rawData ?? '', 0, 100)
+        ]);
+
+        $rawDevices = $rawData ? json_decode($rawData, true) : [];
+        Log::info('JSON decode result', [
+            'decoded_count' => count($rawDevices ?? []),
+            'json_error' => json_last_error(),
+            'first_device' => $rawDevices[0] ?? 'none'
+        ]);
+
+        // Parse lastreboot and unixepoch for each device
+        if (is_array($rawDevices)) {
+            foreach ($rawDevices as &$device) {
+                if (isset($device['lastreboot'])) {
+                    $device['lastreboot'] = Carbon::parse($device['lastreboot']);
+                }
+                if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
+                    $device['unixepoch'] = (int) $device['unixepoch'];
+                }
+            }
+        }
+
+        $this->allDevices = $rawDevices ?? []; // Serializable array
+
+        Log::info('Loaded devices from Redis', [
+            'client' => $this->selectedClient,
+            'full_key' => $fullKey,
+            'retrieved_count' => count($rawDevices ?? []),
+            'first_mac' => is_array($rawDevices) && isset($rawDevices[0]) ? $rawDevices[0]['macAddress'] : 'none',
+        ]);
     }
 
     public function render()
     {
         Log::info('Render called', [
-            'client' => $this->client,
-            'page' => request()->query('page', 1),
+            'allDevices_count' => count($this->allDevices),
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
-            'macSearch' => $this->macSearch,
-            'filter' => $this->filter
+            'page' => $this->page ?? 'not set'
         ]);
 
-        $query = Device::where('client', $this->client);
+        $perPage = 30;
 
-        if ($this->filter === 'warning') {
-            $query->where('warning', 1);
-        } elseif ($this->filter === 'error') {
-            $query->where('error', 1);
-        }
+        // Sort the devices
+        $sortedDevices = collect($this->allDevices)->sortBy(
+            $this->sortField,
+            SORT_REGULAR,
+            $this->sortDirection === 'desc'
+        );
 
-        if ($this->macSearch) {
-            $query->where('macAddress', 'like', '%' . $this->macSearch . '%');
-        }
+        // Paginate using LengthAwarePaginator
+        $paginatedDevices = new LengthAwarePaginator(
+            $sortedDevices->forPage($this->getPage(), $perPage), // Use getPage() from WithPagination
+            $sortedDevices->count(),
+            $perPage,
+            $this->getPage(), // Use getPage() to ensure compatibility
+            ['path' => url()->current(), 'pageName' => 'page']
+        );
 
-        if ($this->sortField === 'last_status') {
-            $query->orderBy('unixepoch', $this->sortDirection);
-        } elseif ($this->sortField === 'macAddress') {
-            $query->orderBy('macAddress', $this->sortDirection);
-        }
-
-        $cacheKey = 'device_info_' . $this->client . '_page_' . request()->query('page', 1) . '_' . $this->filter . '_' . $this->macSearch . '_' . $this->sortField . '_' . $this->sortDirection;
-        $paginatedDevices = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($query) {
-            return $query->paginate($this->perPage);
-        });
-
-        if ($paginatedDevices->isEmpty() && $this->client) {
-            $this->error = 'No devices found for client: ' . $this->client . ($this->filter ? " with $this->filter" : '');
-        } else {
-            $this->error = '';
-        }
-
-        return view('livewire.device-info', [
+        return view('livewire.pages.devices.device-info', [
             'paginatedDevices' => $paginatedDevices,
-            'totalDevices' => $paginatedDevices->total(),
-            'lastApiCall' => $this->lastApiCall,
-            'warningCount' => $this->warningCount,
-            'errorCount' => $this->errorCount
+            'clients' => $this->clients,
         ])->layout('layouts.app');
     }
 }
