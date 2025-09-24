@@ -15,40 +15,50 @@ class DeviceInfo extends Component
 {
     use WithPagination;
 
-    public $selectedClient = ''; // Default to no client
+    public $selectedClient = '';
     public $clients;
-    public $allDevices = []; // Serializable array of all devices for this client
+    public $allDevices = [];
+    public $deviceDetails = [];
     public $loading = false;
-    public $sortField = 'macAddress'; // Default sort field
-    public $sortDirection = 'asc'; // Default sort direction
+    public $sortField = 'macAddress';
+    public $sortDirection = 'asc';
+    public $selectedDeviceMac = '';
+    public $selectedDeviceDetails = [];
 
-    // Define query string parameters to persist state in URL
     protected $queryString = [
         'page' => ['except' => 1],
         'sortField' => ['except' => 'macAddress'],
         'sortDirection' => ['except' => 'asc'],
-        'selectedClient' => ['except' => ''], // Persist selected client
+        'selectedClient' => ['except' => '']
     ];
 
     public function sortBy($field)
     {
         if ($this->sortField === $field) {
-            // Toggle direction if clicking the same field
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
-            // Set new sort field and default to ascending
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-
-        // Reset pagination to page 1 when sorting
         $this->resetPage();
+    }
+
+    public function showDeviceDetails($macAddress)
+    {
+        $this->selectedDeviceMac = $macAddress;
+        $this->selectedDeviceDetails = $this->deviceDetails[strtoupper($macAddress)] ?? [];
+    }
+
+    public function closeModal()
+    {
+        $this->selectedDeviceMac = '';
+        $this->selectedDeviceDetails = [];
     }
 
     public function mount()
     {
-        $this->clients = Client::pluck('name', 'name')->toArray(); // From DB
-        $this->selectedClient = array_key_first($this->clients) ?? ''; // Auto-select first if available
+        $this->clients = Client::pluck('name', 'name')->toArray();
+        $this->selectedClient = array_key_first($this->clients) ?? '';
         Log::info('Component mounted', ['selectedClient' => $this->selectedClient, 'clients' => $this->clients]);
         if (!empty($this->selectedClient)) {
             $this->loadDevices();
@@ -58,8 +68,8 @@ class DeviceInfo extends Component
     public function updatedSelectedClient($value)
     {
         Log::info('updatedSelectedClient triggered', ['new_value' => $value]);
-        $this->resetPage(); // Reset pagination when client changes
-        $this->loadDevices(); // Reloads allDevices; pagination handled in render
+        $this->resetPage();
+        $this->loadDevices();
     }
 
     public function refreshData()
@@ -67,15 +77,10 @@ class DeviceInfo extends Component
         if (empty($this->selectedClient)) {
             return;
         }
-
         $this->loading = true;
-
-        // Run the artisan command to refresh API data for the selected client
         Artisan::call('devices:fetch --client=' . $this->selectedClient);
-
-        // Reload devices from Redis
+        Artisan::call('device-details:fetch --client=' . $this->selectedClient);
         $this->loadDevices();
-
         $this->loading = false;
     }
 
@@ -90,36 +95,17 @@ class DeviceInfo extends Component
         Log::info('loadDevices called', ['selectedClient' => $this->selectedClient]);
         if (empty($this->selectedClient)) {
             $this->allDevices = [];
+            $this->deviceDetails = [];
             Log::info('loadDevices: Client empty, setting allDevices to []');
             return;
         }
 
+        // Load basic devices
         $redis = Redis::connection('cache');
-        $clientKey = "devices:{$this->selectedClient}"; // Bare key
-        Log::info('Redis key', ['clientKey' => $clientKey]);
-
-        $fullKey = $clientKey; // Full key for raw get
-        Log::info('Full Redis key', ['fullKey' => $fullKey]);
-
-        $rawClient = $redis->client(); // Raw phpredis client
-        $rawData = $rawClient->get($fullKey); // Get with full key, no additional prefix
-        Log::info('Redis raw data', ['rawData' => substr($rawData ?? '', 0, 100)]);
-
-        Log::info('Redis raw get result', [
-            'full_key' => $fullKey,
-            'rawData_length' => strlen($rawData ?? ''),
-            'is_null' => is_null($rawData),
-            'rawData_preview' => substr($rawData ?? '', 0, 100)
-        ]);
-
+        $clientKey = "devices:{$this->selectedClient}";
+        $rawClient = $redis->client();
+        $rawData = $rawClient->get($clientKey);
         $rawDevices = $rawData ? json_decode($rawData, true) : [];
-        Log::info('JSON decode result', [
-            'decoded_count' => count($rawDevices ?? []),
-            'json_error' => json_last_error(),
-            'first_device' => $rawDevices[0] ?? 'none'
-        ]);
-
-        // Parse lastreboot and unixepoch for each device
         if (is_array($rawDevices)) {
             foreach ($rawDevices as &$device) {
                 if (isset($device['lastreboot'])) {
@@ -128,16 +114,44 @@ class DeviceInfo extends Component
                 if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
                     $device['unixepoch'] = (int) $device['unixepoch'];
                 }
+                $device['status'] = $device['error'] ? 'Error' : ($device['warning'] ? 'Warning' : 'OK');
             }
         }
+        $this->allDevices = $rawDevices ?? [];
 
-        $this->allDevices = $rawDevices ?? []; // Serializable array
-
-        Log::info('Loaded devices from Redis', [
+        // Load details
+        $detailsKey = "device_details:{$this->selectedClient}";
+        $detailsRaw = $rawClient->get($detailsKey);
+        $this->deviceDetails = $detailsRaw ? json_decode($detailsRaw, true) : [];
+        Log::info('Loaded details from Redis', [
             'client' => $this->selectedClient,
-            'full_key' => $fullKey,
-            'retrieved_count' => count($rawDevices ?? []),
-            'first_mac' => is_array($rawDevices) && isset($rawDevices[0]) ? $rawDevices[0]['macAddress'] : 'none',
+            'details_key' => $detailsKey,
+            'details_count' => count($this->deviceDetails),
+            'sample_detail_keys' => array_slice(array_keys($this->deviceDetails), 0, 3)
+        ]);
+
+        // Merge details into allDevices
+        foreach ($this->allDevices as &$device) {
+            $mac = strtoupper(trim($device['macAddress'] ?? '')); // Use macAddress from basic devices
+            $detail = $this->deviceDetails[$mac] ?? [];
+            $device['display_name'] = $detail['display_name'] ?? 'N/A';
+            $device['device_version'] = $detail['device_version'] ?? 'N/A';
+            $device['site_name'] = $detail['site_name'] ?? 'N/A';
+            Log::debug('Merged device', [
+                'mac_original' => $device['macAddress'] ?? 'N/A',
+                'mac_upper_trim' => $mac,
+                'detail_found' => !empty($detail),
+                'display_name' => $device['display_name'],
+                'device_version' => $device['device_version'],
+                'site_name' => $device['site_name']
+            ]);
+        }
+
+        Log::info('Loaded devices and details from Redis', [
+            'client' => $this->selectedClient,
+            'devices_count' => count($this->allDevices),
+            'details_count' => count($this->deviceDetails),
+            'matched_count' => count(array_filter($this->allDevices, fn($d) => $d['display_name'] !== 'N/A'))
         ]);
     }
 
@@ -147,30 +161,27 @@ class DeviceInfo extends Component
             'allDevices_count' => count($this->allDevices),
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
-            'page' => $this->page ?? 'not set'
+            'page' => $this->getPage()
         ]);
 
-        $perPage = 30;
-
-        // Sort the devices
+        $perPage = 10;
         $sortedDevices = collect($this->allDevices)->sortBy(
             $this->sortField,
             SORT_REGULAR,
             $this->sortDirection === 'desc'
         );
 
-        // Paginate using LengthAwarePaginator
         $paginatedDevices = new LengthAwarePaginator(
-            $sortedDevices->forPage($this->getPage(), $perPage), // Use getPage() from WithPagination
+            $sortedDevices->forPage($this->getPage(), $perPage),
             $sortedDevices->count(),
             $perPage,
-            $this->getPage(), // Use getPage() to ensure compatibility
+            $this->getPage(),
             ['path' => url()->current(), 'pageName' => 'page']
         );
 
         return view('livewire.pages.devices.device-info', [
             'paginatedDevices' => $paginatedDevices,
-            'clients' => $this->clients,
+            'clients' => $this->clients
         ])->layout('layouts.app');
     }
 }

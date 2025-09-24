@@ -6,13 +6,11 @@
                     <div class="sm:flex sm:items-center">
                         <div class="sm:flex-auto">
                             <h1 class="text-base font-semibold leading-6 text-gray-900">Device Information</h1>
-                            <p class="mt-2 text-sm text-gray-700">A list of all devices for the selected client, pulled
-                                from cache.</p>
+                            <p class="mt-2 text-sm text-gray-700">A list of all devices for the selected client, pulled from cache.</p>
                             @if($selectedClient)
                                 <p class="mt-2 text-sm font-medium text-gray-900">Selected Client: {{ $selectedClient }}</p>
                                 <p class="mt-1 text-sm text-gray-600">
-                                    Last API Call:
-                                    {{ \Illuminate\Support\Facades\Cache::get("devices_{$selectedClient}_last_api_call") ? \Carbon\Carbon::parse(\Illuminate\Support\Facades\Cache::get("devices_{$selectedClient}_last_api_call"))->format('Y-m-d H:i:s') : 'N/A' }}
+                                    Last API Call: {{ \Illuminate\Support\Facades\Cache::get("devices_{$selectedClient}_last_api_call") ? \Carbon\Carbon::parse(\Illuminate\Support\Facades\Cache::get("devices_{$selectedClient}_last_api_call"))->format('Y-m-d H:i:s') : 'N/A' }}
                                 </p>
                             @else
                                 <p class="mt-2 text-sm text-gray-600">No client selected.</p>
@@ -38,43 +36,60 @@
 
                     {{-- Client Selection Dropdown --}}
                     <div class="mt-4 mb-6">
-                        <label for="selectedClient" class="block text-sm font-medium text-gray-700 mb-2">Select
-                            Client</label>
+                        <label for="selectedClient" class="block text-sm font-medium text-gray-700 mb-2">Select Client</label>
                         <select id="selectedClient" wire:model.live="selectedClient" wire:change="loadDevices"
                             class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="">-- No Client Selected --</option>
                             @foreach($clients as $client)
-                                <option value="{{ $client }}" {{ $selectedClient == $client ? 'selected' : '' }}>{{ $client }}
-                                </option>
+                                <option value="{{ $client }}" {{ $selectedClient == $client ? 'selected' : '' }}>{{ $client }}</option>
                             @endforeach
                         </select>
 
                         {{-- Debug Info (remove after fixing) --}}
-                        <p class="mt-2 text-sm text-gray-600">Debug: Selected Client = "{{ $selectedClient }}", Total
-                            Devices = {{ count($allDevices) }}, Page Devices = {{ $paginatedDevices->count() }}</p>
+                        <p class="mt-2 text-sm text-gray-600">Debug: Selected Client = "{{ $selectedClient }}", Total Devices = {{ count($allDevices) }}, Page Devices = {{ $paginatedDevices->count() }}</p>
                     </div>
 
                     <div class="mt-8 flow-root">
                         @if($paginatedDevices->isEmpty())
-                            <p class="text-gray-500">No devices found for the selected client. Select a client to view data.
-                            </p>
+                            <p class="text-gray-500">No devices found for the selected client. Select a client to view data.</p>
                         @else
                             <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-300">
                                     <thead class="bg-gray-50">
                                         <tr>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                <button wire:click="sortBy('macAddress')"
-                                                    class="flex items-center space-x-1">
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('macAddress')" class="flex items-center space-x-1">
                                                     <span>MAC Address</span>
                                                     @if($sortField === 'macAddress')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('display_name')" class="flex items-center space-x-1">
+                                                    <span>Display Name</span>
+                                                    @if($sortField === 'display_name')
+                                                        <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
+                                                    @endif
+                                                </button>
+                                            </th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('device_version')" class="flex items-center space-x-1">
+                                                    <span>Device Version</span>
+                                                    @if($sortField === 'device_version')
+                                                        <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
+                                                    @endif
+                                                </button>
+                                            </th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('site_name')" class="flex items-center space-x-1">
+                                                    <span>Site Name</span>
+                                                    @if($sortField === 'site_name')
+                                                        <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
+                                                    @endif
+                                                </button>
+                                            </th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                                                 <button wire:click="sortBy('model')" class="flex items-center space-x-1">
                                                     <span>Model</span>
                                                     @if($sortField === 'model')
@@ -82,93 +97,84 @@
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                <button wire:click="sortBy('operatingSystem')"
-                                                    class="flex items-center space-x-1">
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('operatingSystem')" class="flex items-center space-x-1">
                                                     <span>OS</span>
                                                     @if($sortField === 'operatingSystem')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                <button wire:click="sortBy('firmwareVersion')"
-                                                    class="flex items-center space-x-1">
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('firmwareVersion')" class="flex items-center space-x-1">
                                                     <span>Firmware</span>
                                                     @if($sortField === 'firmwareVersion')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                <button wire:click="sortBy('lastreboot')"
-                                                    class="flex items-center space-x-1">
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 min-w-[150px]">
+                                                <button wire:click="sortBy('lastreboot')" class="flex items-center space-x-1">
                                                     <span>Last Reboot</span>
                                                     @if($sortField === 'lastreboot')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                <button wire:click="sortBy('unixepoch')"
-                                                    class="flex items-center space-x-1">
-                                                    <span>Last Ping </span>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 min-w-[150px]">
+                                                <button wire:click="sortBy('unixepoch')" class="flex items-center space-x-1">
+                                                    <span>Last Ping</span>
                                                     @if($sortField === 'unixepoch')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
                                                 </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                                <button wire:click="sortBy('status')" class="flex items-center space-x-1">
+                                                    <span>Status</span>
+                                                    @if($sortField === 'status')
+                                                        <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
+                                                    @endif
+                                                </button>
                                             </th>
-                                            <th scope="col"
-                                                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Screenshot
-                                            </th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Screenshot</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-200 bg-white">
                                         @foreach($paginatedDevices as $device)
                                             <tr class="hover:bg-gray-50">
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['macAddress'] ?? 'Unknown MAC' }}
+                                                    <button wire:click="showDeviceDetails('{{ $device['macAddress'] }}')" class="underline cursor-pointer text-blue-600 hover:text-blue-800">
+                                                        {{ $device['macAddress'] ?? 'Unknown MAC' }}
+                                                    </button>
                                                 </td>
-                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['model'] ?? 'N/A' }}
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['operatingSystem'] ?? 'N/A' }}
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['firmwareVersion'] ?? 'N/A' }}
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['display_name'] ?? 'N/A' }}</td>
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['device_version'] ?? 'N/A' }}</td>
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['site_name'] ?? 'N/A' }}</td>
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['model'] ?? 'N/A' }}</td>
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['operatingSystem'] ?? 'N/A' }}</td>
+                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ $device['firmwareVersion'] ?? 'N/A' }}</td>
+                                                <td class="px-3 py-4 text-sm text-gray-500">
                                                     {{ $device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : 'N/A' }}
                                                 </td>
-                                                <td class="px-3 py-4 text-sm text-gray-500 min-w-[120px]">
+                                                <td class="px-3 py-4 text-sm text-gray-500 ">
                                                     {{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : 'N/A' }}
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                                     <div class="flex space-x-2">
-                                                        @if($device['warning'])
-                                                            <span
-                                                                class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">Warning</span>
-                                                        @endif
-                                                        @if($device['error'])
-                                                            <span
-                                                                class="px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded">Error</span>
+                                                        @if($device['status'] === 'Warning')
+                                                            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">Warning</span>
+                                                        @elseif($device['status'] === 'Error')
+                                                            <span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded">Error</span>
+                                                        @else
+                                                            <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">OK</span>
                                                         @endif
                                                     </div>
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                                     @if($device['screenshot'])
-                                                        <a href="{{ $device['screenshot'] }}" target="_blank"
-                                                            rel="noopener noreferrer">
-                                                            <button type="button"
-                                                                class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                                        <a href="{{ $device['screenshot'] }}" target="_blank" rel="noopener noreferrer">
+                                                            <button type="button" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                                                                 View
                                                             </button>
                                                         </a>
@@ -196,11 +202,9 @@
                                     @php
                                         $currentPage = $paginatedDevices->currentPage();
                                         $lastPage = $paginatedDevices->lastPage();
-                                        $window = 2; // Number of pages to show on each side of current page
+                                        $window = 2;
                                         $startPage = max(1, $currentPage - $window);
                                         $endPage = min($lastPage, $currentPage + $window);
-
-                                        // Adjust start/end to ensure at least 5 pages are shown (if possible)
                                         if ($endPage - $startPage < 4) {
                                             if ($currentPage <= $window + 1) {
                                                 $endPage = min($lastPage, $startPage + 4);
@@ -210,7 +214,6 @@
                                         }
                                     @endphp
 
-                                    {{-- First Page --}}
                                     @if ($startPage > 1)
                                         <button wire:click="gotoPage(1)"
                                             class="inline-flex items-center px-4 py-2 {{ $currentPage == 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700' }} border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest hover:bg-gray-300 focus:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
@@ -221,7 +224,6 @@
                                         @endif
                                     @endif
 
-                                    {{-- Page Range --}}
                                     @foreach (range($startPage, $endPage) as $page)
                                         <button wire:click="gotoPage({{ $page }})"
                                             class="inline-flex items-center px-4 py-2 {{ $page == $currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700' }} border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest hover:bg-gray-300 focus:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
@@ -229,7 +231,6 @@
                                         </button>
                                     @endforeach
 
-                                    {{-- Last Page --}}
                                     @if ($endPage < $lastPage)
                                         @if ($endPage < $lastPage - 1)
                                             <span class="px-2 py-1 text-gray-500">...</span>
@@ -240,12 +241,40 @@
                                         </button>
                                     @endif
 
-                                    {{-- Next Button --}}
                                     <button wire:click="nextPage" wire:loading.attr="disabled"
                                         class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 focus:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25"
                                         {{ $paginatedDevices->onLastPage() ? 'disabled' : '' }}>
                                         Next
                                     </button>
+                                </div>
+                            @endif
+
+                            {{-- Modal for Device Details --}}
+                            @if($selectedDeviceMac)
+                                <div x-data="{ open: true }" x-show="open" x-transition class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                                    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                                        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" x-on:click="open = false"></div>
+                                        <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+                                            <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                                                <div class="sm:flex sm:items-start">
+                                                    <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                                                        <h3 class="text-base font-semibold leading-6 text-gray-900" id="modal-title">
+                                                            Device Details for MAC: {{ $selectedDeviceMac }}
+                                                        </h3>
+                                                        <div class="mt-2">
+                                                            <pre class="text-sm text-gray-600 overflow-auto max-h-96">{{ json_encode($selectedDeviceDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                                                <button wire:click="closeModal" type="button"
+                                                    class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
+                                                    Close
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
                         @endif
@@ -255,3 +284,5 @@
         </div>
     </div>
 </div>
+
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>

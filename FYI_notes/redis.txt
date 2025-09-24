@@ -7,3 +7,6 @@ $redis->smembers('client_devices:sheetz1');  // Should list MACs
 
 $rawClient = $redis->client();
 
+$rawData = $rawClient->get($fullKey);
+        
+        
