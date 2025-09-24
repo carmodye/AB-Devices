@@ -29,16 +29,16 @@ class FetchDeviceData extends Command
         foreach ($clients as $client) {
             try {
                 $url = env('DEVICE_API_URL');
-                if (! $url) {
+                if (!$url) {
                     Log::error('DEVICE_API_URL not set', ['client' => $client]);
                     throw new \Exception('API URL not configured');
                 }
                 $response = Http::timeout(10)->get($url, ['client' => $client]);
                 Log::info('API Response', [
                     'client' => $client,
-                    'url' => $url.'?client='.$client,
+                    'url' => $url . '?client=' . $client,
                     'status' => $response->status(),
-                    'body_size' => strlen($response->body()) / 1024 / 1024 .'MB',
+                    'body_size' => strlen($response->body()) / 1024 / 1024 . 'MB',
                     'device_count' => is_array($response->json()) ? count($response->json()) : 0,
                 ]);
                 if ($response->successful()) {
@@ -78,11 +78,11 @@ class FetchDeviceData extends Command
                     $redis->set($clientKey, json_encode($cacheData), 'EX', $ttl);
 
                     // Also store last API call via Cache facade
-                    \Illuminate\Support\Facades\Cache::put('devices_'.$client.'_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
+                    \Illuminate\Support\Facades\Cache::put('devices_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
                     Log::info('Devices stored for client in Redis', ['client' => $client, 'bare_key' => $clientKey, 'stored_count' => count($cacheData)]);
                 } else {
                     Log::error('API request failed', ['client' => $client, 'status' => $response->status()]);
-                    throw new \Exception('API request failed with status: '.$response->status());
+                    throw new \Exception('API request failed with status: ' . $response->status());
                 }
             } catch (\Exception $e) {
                 Log::error('Error fetching devices for client', [

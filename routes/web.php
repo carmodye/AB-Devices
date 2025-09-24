@@ -36,7 +36,3 @@ Route::get('/notes/edit/{note}', EditNote::class)
 Route::get('/device-info', DeviceInfo::class)
     ->middleware(['auth', 'verified'])
     ->name('device-info');
-
-Route::get('/device-dashboard', DeviceDashboard::class)
-    ->middleware(['auth', 'verified'])
-    ->name('device-dashboard');

@@ -116,7 +116,7 @@
                                                 class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                                                 <button wire:click="sortBy('unixepoch')"
                                                     class="flex items-center space-x-1">
-                                                    <span>Unix Epoch</span>
+                                                    <span>Last Ping </span>
                                                     @if($sortField === 'unixepoch')
                                                         <span>{!! $sortDirection === 'asc' ? '&uarr;' : '&darr;' !!}</span>
                                                     @endif
@@ -134,18 +134,23 @@
                                         @foreach($paginatedDevices as $device)
                                             <tr class="hover:bg-gray-50">
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['macAddress'] ?? 'Unknown MAC' }}</td>
+                                                    {{ $device['macAddress'] ?? 'Unknown MAC' }}
+                                                </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['model'] ?? 'N/A' }}</td>
+                                                    {{ $device['model'] ?? 'N/A' }}
+                                                </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['operatingSystem'] ?? 'N/A' }}</td>
+                                                    {{ $device['operatingSystem'] ?? 'N/A' }}
+                                                </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['firmwareVersion'] ?? 'N/A' }}</td>
+                                                    {{ $device['firmwareVersion'] ?? 'N/A' }}
+                                                </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                                     {{ $device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : 'N/A' }}
                                                 </td>
-                                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                    {{ $device['unixepoch'] ?? 'N/A' }}</td>
+                                                <td class="px-3 py-4 text-sm text-gray-500 min-w-[120px]">
+                                                    {{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : 'N/A' }}
+                                                </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                                     <div class="flex space-x-2">
                                                         @if($device['warning'])
