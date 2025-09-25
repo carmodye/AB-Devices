@@ -6,11 +6,11 @@ use App\Models\Client;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Illuminate\Support\Facades\Auth;
 
 class DeviceInfo extends Component
 {
@@ -25,12 +25,14 @@ class DeviceInfo extends Component
     public $sortDirection = 'asc';
     public $selectedDeviceMac = '';
     public $selectedDeviceDetails = [];
+    public $search = '';
 
     protected $queryString = [
         'page' => ['except' => 1],
         'sortField' => ['except' => 'macAddress'],
         'sortDirection' => ['except' => 'asc'],
-        'selectedClient' => ['except' => '']
+        'selectedClient' => ['except' => ''],
+        'search' => ['except' => '']
     ];
 
     public function sortBy($field)
@@ -47,7 +49,18 @@ class DeviceInfo extends Component
     public function showDeviceDetails($macAddress)
     {
         $this->selectedDeviceMac = $macAddress;
-        $this->selectedDeviceDetails = $this->deviceDetails[strtoupper($macAddress)] ?? [];
+        $macUpper = strtoupper(trim($macAddress));
+        // Merge basic device data and details for the modal
+        $basicDevice = collect($this->allDevices)->firstWhere('macAddress', $macAddress) ?? [];
+        $details = $this->deviceDetails[$macUpper] ?? [];
+        $this->selectedDeviceDetails = array_merge($basicDevice, $details);
+        Log::info('showDeviceDetails called', [
+            'macAddress' => $macAddress,
+            'macUpper' => $macUpper,
+            'basicDevice' => $basicDevice,
+            'details' => $details,
+            'selectedDeviceDetails' => $this->selectedDeviceDetails
+        ]);
     }
 
     public function closeModal()
@@ -76,6 +89,7 @@ class DeviceInfo extends Component
     public function updatedSelectedClient($value)
     {
         Log::info('updatedSelectedClient triggered', ['new_value' => $value]);
+        $this->search = ''; // Reset search when client changes
         $this->resetPage();
         $this->loadDevices();
     }
@@ -98,9 +112,24 @@ class DeviceInfo extends Component
         $this->loadDevices();
     }
 
+    public function searchDevices()
+    {
+        Log::info('searchDevices called', ['search' => $this->search, 'selectedClient' => $this->selectedClient]);
+        $this->resetPage();
+        $this->loadDevices();
+    }
+
+    public function clearSearch()
+    {
+        $this->search = '';
+        Log::info('clearSearch called', ['selectedClient' => $this->selectedClient]);
+        $this->resetPage();
+        $this->loadDevices();
+    }
+
     public function loadDevices()
     {
-        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient]);
+        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search]);
         if (empty($this->selectedClient)) {
             $this->allDevices = [];
             $this->deviceDetails = [];
@@ -135,23 +164,30 @@ class DeviceInfo extends Component
             'client' => $this->selectedClient,
             'details_key' => $detailsKey,
             'details_count' => count($this->deviceDetails),
-            'sample_detail_keys' => array_slice(array_keys($this->deviceDetails), 0, 3)
+            'sample_detail_keys' => array_slice(array_keys($this->deviceDetails), 0, 3),
+            'full_details' => $this->deviceDetails // Log full details for debugging
         ]);
 
         // Merge details into allDevices
         foreach ($this->allDevices as &$device) {
-            $mac = strtoupper(trim($device['macAddress'] ?? '')); // Use macAddress from basic devices
+            $mac = strtoupper(trim($device['macAddress'] ?? ''));
             $detail = $this->deviceDetails[$mac] ?? [];
-            $device['display_name'] = $detail['display_name'] ?? 'N/A';
-            $device['device_version'] = $detail['device_version'] ?? 'N/A';
-            $device['site_name'] = $detail['site_name'] ?? 'N/A';
+            $device['display_name'] = $detail['display_name'] ?? $device['display_name'] ?? 'N/A';
+            $device['device_version'] = $detail['device_version'] ?? $device['device_version'] ?? 'N/A';
+            $device['site_name'] = $detail['site_name'] ?? $device['site_name'] ?? 'N/A';
+            $device['model'] = $detail['model'] ?? $device['model'] ?? 'N/A';
+            $device['operatingSystem'] = $detail['operatingSystem'] ?? $device['operatingSystem'] ?? 'N/A';
+            $device['firmwareVersion'] = $detail['firmwareVersion'] ?? $device['firmwareVersion'] ?? 'N/A';
             Log::debug('Merged device', [
                 'mac_original' => $device['macAddress'] ?? 'N/A',
                 'mac_upper_trim' => $mac,
                 'detail_found' => !empty($detail),
                 'display_name' => $device['display_name'],
                 'device_version' => $device['device_version'],
-                'site_name' => $device['site_name']
+                'site_name' => $device['site_name'],
+                'model' => $device['model'],
+                'operatingSystem' => $device['operatingSystem'],
+                'firmwareVersion' => $device['firmwareVersion']
             ]);
         }
 
@@ -169,19 +205,38 @@ class DeviceInfo extends Component
             'allDevices_count' => count($this->allDevices),
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
-            'page' => $this->getPage()
+            'page' => $this->getPage(),
+            'search' => $this->search
         ]);
-
-        //$perPage = 10;
 
         $perPage = env('DEVICE_DEFAULT_PAGINATION', 10);
 
-        $sortedDevices = collect($this->allDevices)->sortBy(
+        // Filter devices based on search term
+        $filteredDevices = collect($this->allDevices);
+        if (!empty($this->search)) {
+            $searchTerm = strtolower(trim($this->search));
+            $filteredDevices = $filteredDevices->filter(function ($device) use ($searchTerm) {
+                return str_contains(strtolower($device['macAddress'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['display_name'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['device_version'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['site_name'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['model'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['operatingSystem'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['firmwareVersion'] ?? ''), $searchTerm) ||
+                    str_contains(strtolower($device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : ''), $searchTerm) ||
+                    str_contains(strtolower($device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : ''), $searchTerm) ||
+                    str_contains(strtolower($device['status'] ?? ''), $searchTerm);
+            });
+        }
+
+        // Apply sorting
+        $sortedDevices = $filteredDevices->sortBy(
             $this->sortField,
             SORT_REGULAR,
             $this->sortDirection === 'desc'
         );
 
+        // Paginate the results
         $paginatedDevices = new LengthAwarePaginator(
             $sortedDevices->forPage($this->getPage(), $perPage),
             $sortedDevices->count(),

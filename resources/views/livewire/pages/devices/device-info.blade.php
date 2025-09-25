@@ -34,19 +34,43 @@
                         </div>
                     </div>
 
-                    {{-- Client Selection Dropdown --}}
+                    {{-- Client Selection Dropdown and Search Input --}}
                     <div class="mt-4 mb-6">
-                        <label for="selectedClient" class="block text-sm font-medium text-gray-700 mb-2">Select Client</label>
-                        <select id="selectedClient" wire:model.live="selectedClient" wire:change="loadDevices"
-                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">-- No Client Selected --</option>
-                            @foreach($clients as $client)
-                                <option value="{{ $client }}" {{ $selectedClient == $client ? 'selected' : '' }}>{{ $client }}</option>
-                            @endforeach
-                        </select>
+                        <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4">
+                            <div class="flex-1">
+                                <label for="selectedClient" class="block text-sm font-medium text-gray-700 mb-2">Select Client</label>
+                                <select id="selectedClient" wire:model.live="selectedClient" wire:change="loadDevices"
+                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">-- No Client Selected --</option>
+                                    @foreach($clients as $client)
+                                        <option value="{{ $client }}" {{ $selectedClient == $client ? 'selected' : '' }}>{{ $client }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="flex-1 mt-4 sm:mt-0">
+                                <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search Devices</label>
+                                <div class="flex rounded-md shadow-sm">
+                                    <input type="text" id="search" wire:model.live.debounce.500ms="search" placeholder="Search devices..."
+                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <button wire:click="searchDevices" wire:loading.attr="disabled"
+                                        class="ml-2 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+                                        Search
+                                    </button>
+                                    <button wire:click="clearSearch" wire:loading.attr="disabled"
+                                        class="ml-2 inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-500 focus:bg-gray-500 active:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+                                        Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                        {{-- Debug Info (remove after fixing) --}}
-                        <p class="mt-2 text-sm text-gray-600">Debug: Selected Client = "{{ $selectedClient }}", Total Devices = {{ count($allDevices) }}, Page Devices = {{ $paginatedDevices->count() }}</p>
+                        {{-- Debug Info --}}
+                        <p class="mt-2 text-sm text-gray-600">
+                            Debug: Selected Client = "{{ $selectedClient }}", 
+                            Total Devices = {{ count($allDevices) }}, 
+                            Page Devices = {{ $paginatedDevices->count() }},
+                            Device Details Count = {{ count($deviceDetails) }}
+                        </p>
                     </div>
 
                     <div class="mt-8 flow-root">
@@ -157,7 +181,7 @@
                                                 <td class="px-3 py-4 text-sm text-gray-500">
                                                     {{ $device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : 'N/A' }}
                                                 </td>
-                                                <td class="px-3 py-4 text-sm text-gray-500 ">
+                                                <td class="px-3 py-4 text-sm text-gray-500">
                                                     {{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : 'N/A' }}
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
@@ -191,14 +215,12 @@
                             {{-- Pagination Links --}}
                             @if ($paginatedDevices->hasPages())
                                 <div class="mt-6 flex justify-center items-center space-x-2">
-                                    {{-- Previous Button --}}
                                     <button wire:click="previousPage" wire:loading.attr="disabled"
                                         class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 focus:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25"
                                         {{ $paginatedDevices->onFirstPage() ? 'disabled' : '' }}>
                                         Previous
                                     </button>
 
-                                    {{-- Page Numbers with Truncation --}}
                                     @php
                                         $currentPage = $paginatedDevices->currentPage();
                                         $lastPage = $paginatedDevices->lastPage();
