@@ -12,6 +12,10 @@ class CreateClientsTable extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->timestamps();
+            $table->foreignId('team_id')
+                ->nullable()
+                ->constrained()
+                ->onDelete('cascade');
         });
     }
 

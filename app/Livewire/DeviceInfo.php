@@ -6,6 +6,7 @@ use App\Models\Client;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
@@ -57,9 +58,16 @@ class DeviceInfo extends Component
 
     public function mount()
     {
-        $this->clients = Client::pluck('name', 'name')->toArray();
+        // Get clients associated with the authenticated user's teams
+        $user = Auth::user();
+        $this->clients = Client::whereIn('team_id', $user->allTeams()->pluck('id'))
+            ->pluck('name', 'name')
+            ->toArray();
+
+        // Set default selected client to the first available client, if any
         $this->selectedClient = array_key_first($this->clients) ?? '';
         Log::info('Component mounted', ['selectedClient' => $this->selectedClient, 'clients' => $this->clients]);
+
         if (!empty($this->selectedClient)) {
             $this->loadDevices();
         }
@@ -164,7 +172,10 @@ class DeviceInfo extends Component
             'page' => $this->getPage()
         ]);
 
-        $perPage = 10;
+        //$perPage = 10;
+
+        $perPage = env('DEVICE_DEFAULT_PAGINATION', 10);
+
         $sortedDevices = collect($this->allDevices)->sortBy(
             $this->sortField,
             SORT_REGULAR,
