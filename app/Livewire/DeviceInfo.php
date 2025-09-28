@@ -19,7 +19,6 @@ class DeviceInfo extends Component
     public $selectedClient = '';
     public $clients;
     public $allDevices = [];
-    public $deviceDetails = [];
     public $loading = false;
     public $sortField = 'macAddress';
     public $sortDirection = 'asc';
@@ -49,16 +48,9 @@ class DeviceInfo extends Component
     public function showDeviceDetails($macAddress)
     {
         $this->selectedDeviceMac = $macAddress;
-        $macUpper = strtoupper(trim($macAddress));
-        // Merge basic device data and details for the modal
-        $basicDevice = collect($this->allDevices)->firstWhere('macAddress', $macAddress) ?? [];
-        $details = $this->deviceDetails[$macUpper] ?? [];
-        $this->selectedDeviceDetails = array_merge($basicDevice, $details);
+        $this->selectedDeviceDetails = collect($this->allDevices)->firstWhere('macAddress', $macAddress) ?? [];
         Log::info('showDeviceDetails called', [
             'macAddress' => $macAddress,
-            'macUpper' => $macUpper,
-            'basicDevice' => $basicDevice,
-            'details' => $details,
             'selectedDeviceDetails' => $this->selectedDeviceDetails
         ]);
     }
@@ -119,6 +111,13 @@ class DeviceInfo extends Component
         $this->loadDevices();
     }
 
+    public function poll()
+    {
+        if (!empty($this->selectedClient)) {
+            $this->loadDevices();
+        }
+    }
+
     public function clearSearch()
     {
         $this->search = '';
@@ -132,16 +131,15 @@ class DeviceInfo extends Component
         Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search]);
         if (empty($this->selectedClient)) {
             $this->allDevices = [];
-            $this->deviceDetails = [];
             Log::info('loadDevices: Client empty, setting allDevices to []');
             return;
         }
 
-        // Load basic devices
+        // Load combined devices
         $redis = Redis::connection('cache');
-        $clientKey = "devices:{$this->selectedClient}";
+        $combinedKey = "combined_devices:{$this->selectedClient}";
         $rawClient = $redis->client();
-        $rawData = $rawClient->get($clientKey);
+        $rawData = $rawClient->get($combinedKey);
         $rawDevices = $rawData ? json_decode($rawData, true) : [];
         if (is_array($rawDevices)) {
             foreach ($rawDevices as &$device) {
@@ -151,51 +149,14 @@ class DeviceInfo extends Component
                 if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
                     $device['unixepoch'] = (int) $device['unixepoch'];
                 }
-                $device['status'] = $device['error'] ? 'Error' : ($device['warning'] ? 'Warning' : 'OK');
+                $device['status'] = isset($device['error']) && $device['error'] ? 'Error' : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
             }
         }
         $this->allDevices = $rawDevices ?? [];
 
-        // Load details
-        $detailsKey = "device_details:{$this->selectedClient}";
-        $detailsRaw = $rawClient->get($detailsKey);
-        $this->deviceDetails = $detailsRaw ? json_decode($detailsRaw, true) : [];
-        Log::info('Loaded details from Redis', [
+        Log::info('Loaded combined devices from Redis', [
             'client' => $this->selectedClient,
-            'details_key' => $detailsKey,
-            'details_count' => count($this->deviceDetails),
-            'sample_detail_keys' => array_slice(array_keys($this->deviceDetails), 0, 3),
-            'full_details' => $this->deviceDetails // Log full details for debugging
-        ]);
-
-        // Merge details into allDevices
-        foreach ($this->allDevices as &$device) {
-            $mac = strtoupper(trim($device['macAddress'] ?? ''));
-            $detail = $this->deviceDetails[$mac] ?? [];
-            $device['display_name'] = $detail['display_name'] ?? $device['display_name'] ?? 'N/A';
-            $device['device_version'] = $detail['device_version'] ?? $device['device_version'] ?? 'N/A';
-            $device['site_name'] = $detail['site_name'] ?? $device['site_name'] ?? 'N/A';
-            $device['model'] = $detail['model'] ?? $device['model'] ?? 'N/A';
-            $device['operatingSystem'] = $detail['operatingSystem'] ?? $device['operatingSystem'] ?? 'N/A';
-            $device['firmwareVersion'] = $detail['firmwareVersion'] ?? $device['firmwareVersion'] ?? 'N/A';
-            Log::debug('Merged device', [
-                'mac_original' => $device['macAddress'] ?? 'N/A',
-                'mac_upper_trim' => $mac,
-                'detail_found' => !empty($detail),
-                'display_name' => $device['display_name'],
-                'device_version' => $device['device_version'],
-                'site_name' => $device['site_name'],
-                'model' => $device['model'],
-                'operatingSystem' => $device['operatingSystem'],
-                'firmwareVersion' => $device['firmwareVersion']
-            ]);
-        }
-
-        Log::info('Loaded devices and details from Redis', [
-            'client' => $this->selectedClient,
-            'devices_count' => count($this->allDevices),
-            'details_count' => count($this->deviceDetails),
-            'matched_count' => count(array_filter($this->allDevices, fn($d) => $d['display_name'] !== 'N/A'))
+            'devices_count' => count($this->allDevices)
         ]);
     }
 
@@ -209,7 +170,7 @@ class DeviceInfo extends Component
             'search' => $this->search
         ]);
 
-        $perPage = env('DEVICE_DEFAULT_PAGINATION', 10);
+        $perPage = env('DEVICE_DEFAULT_PAGINATION', 50);
 
         // Filter devices based on search term
         $filteredDevices = collect($this->allDevices);

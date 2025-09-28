@@ -28,7 +28,7 @@ class Kernel extends ConsoleKernel
     {
         // Schedule FetchDeviceData to run every minute for all clients
         $schedule->command('devices:fetch')
-            ->everyTwentySeconds()
+            ->everyTenSeconds()
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/devices-fetch.log'));
 

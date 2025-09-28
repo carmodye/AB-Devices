@@ -76,6 +76,23 @@ class FetchDeviceData extends Command
                     // Store array as JSON in single key per client (overwrites, assumes API unique per MAC) - bare key, facade adds prefix once
                     $clientKey = "devices:{$client}";
                     $redis->set($clientKey, json_encode($cacheData), 'EX', $ttl);
+                    // Merge with details
+                    $detailsKey = "device_details:{$client}";
+                    $detailsRaw = $redis->get($detailsKey);
+                    $details = $detailsRaw ? json_decode($detailsRaw, true) : [];
+                    $merged = [];
+                    foreach ($cacheData as $device) {
+                        $mac = strtoupper(trim($device['macAddress'] ?? ''));
+                        $detail = $details[$mac] ?? [];
+                        $mergedDevice = $device;
+                        $mergedDevice['display_name'] = $detail['display_name'] ?? null;
+                        $mergedDevice['device_version'] = $detail['device_version'] ?? null;
+                        $mergedDevice['site_name'] = $detail['site_name'] ?? null;
+                        $merged[] = $mergedDevice;
+                    }
+                    $combinedKey = "combined_devices:{$client}";
+                    $redis->set($combinedKey, json_encode($merged), 'EX', $ttl);
+                    Log::info('Combined devices stored', ['client' => $client, 'count' => count($merged)]);
 
                     // Also store last API call via Cache facade
                     \Illuminate\Support\Facades\Cache::put('devices_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));

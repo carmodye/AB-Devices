@@ -55,6 +55,23 @@ class FetchDeviceDetails extends Command
                     // Store as JSON keyed by client
                     $clientKey = "device_details:{$client}";
                     $redis->set($clientKey, json_encode($detailsByMac), 'EX', $ttl);
+                    // Merge with data
+                    $devicesKey = "devices:{$client}";
+                    $devicesRaw = $redis->get($devicesKey);
+                    $devices = $devicesRaw ? json_decode($devicesRaw, true) : [];
+                    $merged = [];
+                    foreach ($devices as $device) {
+                        $mac = strtoupper(trim($device['macAddress'] ?? ''));
+                        $detail = $detailsByMac[$mac] ?? [];
+                        $mergedDevice = $device;
+                        $mergedDevice['display_name'] = $detail['display_name'] ?? null;
+                        $mergedDevice['device_version'] = $detail['device_version'] ?? null;
+                        $mergedDevice['site_name'] = $detail['site_name'] ?? null;
+                        $merged[] = $mergedDevice;
+                    }
+                    $combinedKey = "combined_devices:{$client}";
+                    $redis->set($combinedKey, json_encode($merged), 'EX', $ttl);
+                    Log::info('Combined devices stored', ['client' => $client, 'count' => count($merged)]);
 
                     // Cache last API call
                     \Illuminate\Support\Facades\Cache::put('device_details_' . $client . '_last_api_call', now()->toDateTimeString(), now()->addMinutes(10));
