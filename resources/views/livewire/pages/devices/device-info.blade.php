@@ -161,14 +161,14 @@
                                             @foreach($paginatedDevices as $device)
                                                 <tr>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['macAddress'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['display_name'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['device_version'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['site_name'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['model'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['operatingSystem'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['firmwareVersion'] ?? 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : 'N/A' }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['display_name'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['device_version'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['site_name'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['model'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['operatingSystem'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['firmwareVersion'] ?? 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['lastreboot'] ? $device['lastreboot']->format('y-m-d H:i:s') : 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('y-m-d H:i:s') : 'N/A' }}</td>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                                                         @if($device['status'] === 'Error')
                                                             <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">{{ $device['status'] }}</span>
