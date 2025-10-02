@@ -25,13 +25,15 @@ class DeviceInfo extends Component
     public $selectedDeviceMac = '';
     public $selectedDeviceDetails = [];
     public $search = '';
+    public $statusFilter = ''; // Added for status filtering
 
     protected $queryString = [
         'page' => ['except' => 1],
         'sortField' => ['except' => 'macAddress'],
         'sortDirection' => ['except' => 'asc'],
         'selectedClient' => ['except' => ''],
-        'search' => ['except' => '']
+        'search' => ['except' => ''],
+        'statusFilter' => ['except' => ''], // Added to query string
     ];
 
     public function sortBy($field)
@@ -82,6 +84,7 @@ class DeviceInfo extends Component
     {
         Log::info('updatedSelectedClient triggered', ['new_value' => $value]);
         $this->search = ''; // Reset search when client changes
+        $this->statusFilter = ''; // Reset status filter when client changes
         $this->resetPage();
         $this->loadDevices();
     }
@@ -106,21 +109,15 @@ class DeviceInfo extends Component
 
     public function searchDevices()
     {
-        Log::info('searchDevices called', ['search' => $this->search, 'selectedClient' => $this->selectedClient]);
+        Log::info('searchDevices called', ['search' => $this->search, 'selectedClient' => $this->selectedClient, 'statusFilter' => $this->statusFilter]);
         $this->resetPage();
         $this->loadDevices();
-    }
-
-    public function poll()
-    {
-        if (!empty($this->selectedClient)) {
-            $this->loadDevices();
-        }
     }
 
     public function clearSearch()
     {
         $this->search = '';
+        $this->statusFilter = ''; // Reset status filter when clearing search
         Log::info('clearSearch called', ['selectedClient' => $this->selectedClient]);
         $this->resetPage();
         $this->loadDevices();
@@ -128,7 +125,7 @@ class DeviceInfo extends Component
 
     public function loadDevices()
     {
-        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search]);
+        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search, 'statusFilter' => $this->statusFilter]);
         if (empty($this->selectedClient)) {
             $this->allDevices = [];
             Log::info('loadDevices: Client empty, setting allDevices to []');
@@ -167,7 +164,8 @@ class DeviceInfo extends Component
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
             'page' => $this->getPage(),
-            'search' => $this->search
+            'search' => $this->search,
+            'statusFilter' => $this->statusFilter
         ]);
 
         $perPage = env('DEVICE_DEFAULT_PAGINATION', 50);
@@ -188,6 +186,11 @@ class DeviceInfo extends Component
                     str_contains(strtolower($device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : ''), $searchTerm) ||
                     str_contains(strtolower($device['status'] ?? ''), $searchTerm);
             });
+        }
+
+        // Apply status filter if set
+        if (!empty($this->statusFilter)) {
+            $filteredDevices = $filteredDevices->where('status', $this->statusFilter);
         }
 
         // Apply sorting

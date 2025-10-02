@@ -6,6 +6,9 @@ use App\Livewire\DeviceInfo;
 use App\Livewire\EditNote;
 use App\Livewire\ShowNotes;
 use Illuminate\Support\Facades\Route;
+use App\Livewire\ClientDeviceSummary;
+
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -36,3 +39,8 @@ Route::get('/notes/edit/{note}', EditNote::class)
 Route::get('/device-info', DeviceInfo::class)
     ->middleware(['auth', 'verified'])
     ->name('device-info');
+
+Route::get('/client-device-summary', ClientDeviceSummary::class)
+    ->middleware(['auth', 'verified'])
+    ->name('client-device-summary');
+
