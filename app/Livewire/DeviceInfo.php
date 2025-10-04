@@ -28,6 +28,8 @@ class DeviceInfo extends Component
     public $search = '';
     public $statusFilter = ''; // Added for status filtering
 
+    public $client;        // string from URL
+    public $status;        // status filter from URL
     protected $queryString = [
         'page' => ['except' => 1],
         'sortField' => ['except' => 'macAddress'],
@@ -64,7 +66,8 @@ class DeviceInfo extends Component
         $this->selectedDeviceDetails = [];
     }
 
-    public function mount()
+
+    public function mount($client = null, $status = null)
     {
         // Get clients associated with the authenticated user's teams
         $user = Auth::user();
@@ -72,9 +75,23 @@ class DeviceInfo extends Component
             ->pluck('name', 'name')
             ->toArray();
 
-        // Set default selected client to the first available client, if any
-        $this->selectedClient = array_key_first($this->clients) ?? '';
-        Log::info('Component mounted', ['selectedClient' => $this->selectedClient, 'clients' => $this->clients]);
+        $this->status = $status;
+
+        // If route client exists in the user's clients, use it; otherwise default to first
+        if ($client && array_key_exists($client, $this->clients)) {
+            $this->selectedClient = $client;
+        } else {
+            $this->selectedClient = array_key_first($this->clients) ?? '';
+        }
+
+        $this->statusFilter = $status;
+
+        Log::info('Component mounted', [
+            'route_client' => $client,
+            'selectedClient' => $this->selectedClient,
+            'status' => $this->status,
+            'clients' => $this->clients,
+        ]);
 
         if (!empty($this->selectedClient)) {
             $this->loadDevices();
@@ -142,21 +159,63 @@ class DeviceInfo extends Component
     }
 
 
+    // public function loadDevices()
+    // {
+    //     Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search, 'statusFilter' => $this->statusFilter]);
+    //     if (empty($this->selectedClient)) {
+    //         $this->allDevices = [];
+    //         Log::info('loadDevices: Client empty, setting allDevices to []');
+    //         return;
+    //     }
+
+    //     // Load combined devices
+    //     $redis = Redis::connection('cache');
+    //     $combinedKey = "combined_devices:{$this->selectedClient}";
+    //     $rawClient = $redis->client();
+    //     $rawData = $rawClient->get($combinedKey);
+    //     $rawDevices = $rawData ? json_decode($rawData, true) : [];
+    //     if (is_array($rawDevices)) {
+    //         foreach ($rawDevices as &$device) {
+    //             if (isset($device['lastreboot'])) {
+    //                 $device['lastreboot'] = Carbon::parse($device['lastreboot']);
+    //             }
+    //             if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
+    //                 $device['unixepoch'] = (int) $device['unixepoch'];
+    //             }
+    //             $device['status'] = isset($device['error']) && $device['error'] ? 'Error' : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
+    //         }
+    //     }
+    //     $this->allDevices = $rawDevices ?? [];
+
+    //     Log::info('Loaded combined devices from Redis', [
+    //         'client' => $this->selectedClient,
+    //         'devices_count' => count($this->allDevices)
+    //     ]);
+    // }
+
+
+
     public function loadDevices()
     {
-        Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search, 'statusFilter' => $this->statusFilter]);
+        Log::info('loadDevices called', [
+            'selectedClient' => $this->selectedClient,
+            'search' => $this->search,
+            'statusFilter' => $this->statusFilter
+        ]);
+
         if (empty($this->selectedClient)) {
             $this->allDevices = [];
             Log::info('loadDevices: Client empty, setting allDevices to []');
             return;
         }
 
-        // Load combined devices
+        // Load combined devices from Redis
         $redis = Redis::connection('cache');
         $combinedKey = "combined_devices:{$this->selectedClient}";
         $rawClient = $redis->client();
         $rawData = $rawClient->get($combinedKey);
         $rawDevices = $rawData ? json_decode($rawData, true) : [];
+
         if (is_array($rawDevices)) {
             foreach ($rawDevices as &$device) {
                 if (isset($device['lastreboot'])) {
@@ -165,9 +224,19 @@ class DeviceInfo extends Component
                 if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
                     $device['unixepoch'] = (int) $device['unixepoch'];
                 }
-                $device['status'] = isset($device['error']) && $device['error'] ? 'Error' : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
+                $device['status'] = isset($device['error']) && $device['error']
+                    ? 'Error'
+                    : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
+            }
+
+            // Apply status filter if "down" was requested
+            if ($this->statusFilter === 'down') {
+                $rawDevices = array_filter($rawDevices, function ($device) {
+                    return in_array($device['status'], ['Error', 'Warning']);
+                });
             }
         }
+
         $this->allDevices = $rawDevices ?? [];
 
         Log::info('Loaded combined devices from Redis', [
@@ -175,6 +244,7 @@ class DeviceInfo extends Component
             'devices_count' => count($this->allDevices)
         ]);
     }
+
 
     public function render()
     {

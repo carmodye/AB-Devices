@@ -48,13 +48,18 @@
                             <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4">
                                 <div class="flex-1">
                                     <label for="selectedClient" class="block text-sm font-medium text-gray-700 mb-2">Select Client</label>
-                                    <select id="selectedClient" wire:model.live="selectedClient" wire:change="loadDevices"
-                                        class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        <option value="">-- No Client Selected --</option>
-                                        @foreach($clients as $client)
-                                            <option value="{{ $client }}" {{ $selectedClient == $client ? 'selected' : '' }}>{{ $client }}</option>
-                                        @endforeach
-                                    </select>
+
+                                    <select wire:model="selectedClient" id="client"
+        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 
+               focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 
+               sm:text-sm rounded-md">
+        @foreach($clients as $name => $label)
+            <option value="{{ $name }}">{{ $label }}</option>
+        @endforeach
+    </select>
+
+
+
                                 </div>
                                 <div class="flex-1 mt-4 sm:mt-0">
                                     <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search Devices</label>
