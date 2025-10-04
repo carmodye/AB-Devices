@@ -9,19 +9,36 @@
                                 <h1 class="text-base font-semibold leading-6 text-gray-900">Client Device Summaries</h1>
                                 <p class="mt-2 text-sm text-gray-700">Summaries of devices for all accessible clients, pulled from cache.</p>
                             </div>
-                            <div class="mt-4 sm:mt-0 sm:ml-4">
+<div class="mt-4 sm:mt-0 sm:ml-4">
+    <button wire:click="refreshDevices" wire:loading.attr="disabled"
+        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+        Refresh Devices
+    </button>
+</div>
+
+                        
+                        
+                            {{-- <div class="mt-4 sm:mt-0 sm:ml-4 sm:flex sm:space-x-2">
                                 <button wire:click="refreshSummaries" wire:loading.attr="disabled"
                                     class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
                                     Refresh Summaries
                                 </button>
+                                <button wire:click="manualLoad" wire:loading.attr="disabled"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+                                    Manual Load
+                                </button>
                             </div>
+                         --}}
+                        
+                        
+                        
                         </div>
 
                         {{-- Spinner for Loading States --}}
                         <div wire:loading wire:loading.delay class="mt-4 flex justify-center">
-                            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 48 48">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0  refuted4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </div>
 
@@ -46,17 +63,62 @@
                                                 <tr>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $client }}</td>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $summary['total'] }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $summary['errors'] }}</td>
-                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">{{ $summary['warnings'] }}</td>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                                                        {{ $summary['errors'] }}
+                                                        @if(isset($previousClientSummaries[$client]))
+                                                            @php
+                                                                $errorDiff = $summary['errors'] - ($previousClientSummaries[$client]['errors'] ?? 0);
+                                                            @endphp
+                                                            @if($errorDiff > 0)
+                                                                <span class="inline-flex items-center ml-2 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 rounded-md">
+                                                                    &uarr; +{{ $errorDiff }}
+                                                                </span>
+                                                            @elseif($errorDiff < 0)
+                                                                <span class="inline-flex items-center ml-2 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-md">
+                                                                    &darr; {{ $errorDiff }}
+                                                                </span>
+                                                            @endif
+                                                        @endif
+                                                    </td>
+                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                                                        {{ $summary['warnings'] }}
+                                                        @if(isset($previousClientSummaries[$client]))
+                                                            @php
+                                                                $warningDiff = $summary['warnings'] - ($previousClientSummaries[$client]['warnings'] ?? 0);
+                                                            @endphp
+                                                            @if($warningDiff > 0)
+                                                                <span class="inline-flex items-center ml-2 px-2 py-1 text-xs font-medium text-yellow-800 bg-yellow-50 rounded-md">
+                                                                    &uarr; +{{ $warningDiff }}
+                                                                </span>
+                                                            @elseif($warningDiff < 0)
+                                                                <span class="inline-flex items-center ml-2 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-md">
+                                                                    &darr; {{ $warningDiff }}
+                                                                </span>
+                                                            @endif
+                                                        @endif
+                                                    </td>
+                                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+
+                                                        <!-- View All 
+<button wire:click="viewClient({{ $client }})" class="btn btn-info">
+    View All
+</button>
+
+<button wire:click="viewClientDown({{ $client }})" class="btn btn-danger">
+    View Down
+</button>
+-->
+                                                         
                                                         <a href="{{ route('device-info', ['selectedClient' => urlencode($client)]) }}"
                                                             class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                                             View All
                                                         </a>
+
                                                         <a href="{{ route('device-info', ['selectedClient' => urlencode($client), 'statusFilter' => 'Error']) }}"
                                                             class="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                                             View Down
                                                         </a>
+                                                    
                                                     </td>
                                                 </tr>
                                             @endforeach

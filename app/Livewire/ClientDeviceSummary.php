@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Client;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
@@ -17,6 +18,7 @@ class ClientDeviceSummary extends Component
 
     public $clients;
     public $clientSummaries = [];
+    public $previousClientSummaries = []; // To track previous error/warning counts
     public $allDevices = [];
     public $sortField = 'macAddress';
     public $sortDirection = 'asc';
@@ -30,6 +32,19 @@ class ClientDeviceSummary extends Component
         'sortDirection' => ['except' => 'asc'],
         'search' => ['except' => '']
     ];
+
+
+
+
+    public function viewClient($clientId)
+    {
+        return redirect()->route('device.info', ['client' => $clientId]);
+    }
+
+    public function viewClientDown($clientId)
+    {
+        return redirect()->route('device.info', ['client' => $clientId, 'status' => 'down']);
+    }
 
     public function sortBy($field)
     {
@@ -60,7 +75,6 @@ class ClientDeviceSummary extends Component
 
     public function mount()
     {
-        // Get clients associated with the authenticated user's teams
         $user = Auth::user();
         $this->clients = Client::whereIn('team_id', $user->allTeams()->pluck('id'))
             ->pluck('name', 'name')
@@ -98,9 +112,28 @@ class ClientDeviceSummary extends Component
         $this->resetPage();
     }
 
+    public function refreshDevices()
+    {
+        Artisan::call('devices:fetch');
+        Artisan::call('device-details:fetch');
+
+        $this->loadSummaries(); // reload your summary data
+        session()->flash('message', 'Devices refreshed successfully!');
+    }
+
+
     public function refreshSummaries()
     {
         $this->loadSummaries();
+    }
+
+    public function manualLoad()
+    {
+        Log::info('manualLoad called');
+        $this->loadSummaries();
+        if (!empty($this->search)) {
+            $this->loadAllDevices();
+        }
     }
 
     public function poll()
@@ -111,6 +144,7 @@ class ClientDeviceSummary extends Component
     public function loadSummaries()
     {
         Log::info('loadSummaries called');
+        $this->previousClientSummaries = $this->clientSummaries; // Store current summaries before updating
         $this->clientSummaries = [];
         $redis = Redis::connection('cache');
         $rawClient = $redis->client();
@@ -221,7 +255,8 @@ class ClientDeviceSummary extends Component
 
         return view('livewire.pages.devices.client-device-summary', [
             'paginatedDevices' => $paginatedDevices,
-            'clientSummaries' => $this->clientSummaries
+            'clientSummaries' => $this->clientSummaries,
+            'previousClientSummaries' => $this->previousClientSummaries
         ])->layout('layouts.app');
     }
 }

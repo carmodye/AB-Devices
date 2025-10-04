@@ -12,6 +12,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
 
+
 class DeviceInfo extends Component
 {
     use WithPagination;
@@ -89,6 +90,18 @@ class DeviceInfo extends Component
         $this->loadDevices();
     }
 
+
+    public function refreshDevices()
+    {
+        Artisan::call('devices:fetch');
+        Artisan::call('device-details:fetch');
+
+        // optionally reload devices after refresh
+        $this->loadDevices();
+
+        session()->flash('message', 'Devices refreshed successfully!');
+    }
+
     public function refreshData()
     {
         if (empty($this->selectedClient)) {
@@ -122,6 +135,12 @@ class DeviceInfo extends Component
         $this->resetPage();
         $this->loadDevices();
     }
+
+    public function poll()
+    {
+        $this->loadDevices();
+    }
+
 
     public function loadDevices()
     {

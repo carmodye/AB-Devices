@@ -17,13 +17,29 @@
                                     <p class="mt-2 text-sm text-gray-600">No client selected.</p>
                                 @endif
                             </div>
+                            <div class="mt-4 sm:mt-0 sm:ml-4">
+    <button wire:click="refreshDevices" wire:loading.attr="disabled"
+        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+        Refresh Devices
+    </button>
+</div>
+{{-- 
+
+                            <div class="mt-4 sm:mt-0 sm:ml-4">
+                                <button wire:click="manualLoad" wire:loading.attr="disabled"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
+                                    Manual Load
+                                </button>
+                            </div> --}}
+
+
                         </div>
 
                         {{-- Spinner for Loading States --}}
                         <div wire:loading wire:loading.delay class="mt-4 flex justify-center">
-                            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12">
+                                <circle class="opacity-25" cx="6" cy="6" r="5" stroke="currentColor" stroke-width="2"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M2 6a4 4 0 014-4V0C1.791 0 0 1.791 0 6h2zm1 5.291A4.962 4.962 0 012 6H0c0 2.042.835 3.924 2 5.291l1-1.002z"></path>
                             </svg>
                         </div>
 
@@ -167,8 +183,8 @@
                                                     <td class="px-3 py-4 text-sm text-gray-900">{{ $device['model'] ?? 'N/A' }}</td>
                                                     <td class="px-3 py-4 text-sm text-gray-900">{{ $device['operatingSystem'] ?? 'N/A' }}</td>
                                                     <td class="px-3 py-4 text-sm text-gray-900">{{ $device['firmwareVersion'] ?? 'N/A' }}</td>
-                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['lastreboot'] ? $device['lastreboot']->format('y-m-d H:i:s') : 'N/A' }}</td>
-                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('y-m-d H:i:s') : 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['lastreboot'] ? $device['lastreboot']->format('Y-m-d H:i:s') : 'N/A' }}</td>
+                                                    <td class="px-3 py-4 text-sm text-gray-900">{{ $device['unixepoch'] ? \Carbon\Carbon::createFromTimestampMs($device['unixepoch'])->format('Y-m-d H:i:s') : 'N/A' }}</td>
                                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                                                         @if($device['status'] === 'Error')
                                                             <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">{{ $device['status'] }}</span>
