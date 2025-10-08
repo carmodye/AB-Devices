@@ -159,41 +159,6 @@ class DeviceInfo extends Component
     }
 
 
-    // public function loadDevices()
-    // {
-    //     Log::info('loadDevices called', ['selectedClient' => $this->selectedClient, 'search' => $this->search, 'statusFilter' => $this->statusFilter]);
-    //     if (empty($this->selectedClient)) {
-    //         $this->allDevices = [];
-    //         Log::info('loadDevices: Client empty, setting allDevices to []');
-    //         return;
-    //     }
-
-    //     // Load combined devices
-    //     $redis = Redis::connection('cache');
-    //     $combinedKey = "combined_devices:{$this->selectedClient}";
-    //     $rawClient = $redis->client();
-    //     $rawData = $rawClient->get($combinedKey);
-    //     $rawDevices = $rawData ? json_decode($rawData, true) : [];
-    //     if (is_array($rawDevices)) {
-    //         foreach ($rawDevices as &$device) {
-    //             if (isset($device['lastreboot'])) {
-    //                 $device['lastreboot'] = Carbon::parse($device['lastreboot']);
-    //             }
-    //             if (isset($device['unixepoch']) && is_string($device['unixepoch'])) {
-    //                 $device['unixepoch'] = (int) $device['unixepoch'];
-    //             }
-    //             $device['status'] = isset($device['error']) && $device['error'] ? 'Error' : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
-    //         }
-    //     }
-    //     $this->allDevices = $rawDevices ?? [];
-
-    //     Log::info('Loaded combined devices from Redis', [
-    //         'client' => $this->selectedClient,
-    //         'devices_count' => count($this->allDevices)
-    //     ]);
-    // }
-
-
 
     public function loadDevices()
     {
@@ -228,13 +193,6 @@ class DeviceInfo extends Component
                     ? 'Error'
                     : (isset($device['warning']) && $device['warning'] ? 'Warning' : 'OK');
             }
-
-            // Apply status filter if "down" was requested
-            if ($this->statusFilter === 'down') {
-                $rawDevices = array_filter($rawDevices, function ($device) {
-                    return in_array($device['status'], ['Error', 'Warning']);
-                });
-            }
         }
 
         $this->allDevices = $rawDevices ?? [];
@@ -244,7 +202,6 @@ class DeviceInfo extends Component
             'devices_count' => count($this->allDevices)
         ]);
     }
-
 
     public function render()
     {
@@ -279,7 +236,13 @@ class DeviceInfo extends Component
 
         // Apply status filter if set
         if (!empty($this->statusFilter)) {
-            $filteredDevices = $filteredDevices->where('status', $this->statusFilter);
+            $filteredDevices = $filteredDevices->filter(function ($device) {
+                if ($this->statusFilter === 'down') {
+                    return in_array($device['status'], ['Error', 'Warning']);
+                } else {
+                    return $device['status'] === $this->statusFilter;
+                }
+            });
         }
 
         // Apply sorting
@@ -303,4 +266,5 @@ class DeviceInfo extends Component
             'clients' => $this->clients
         ])->layout('layouts.app');
     }
+
 }

@@ -45,4 +45,3 @@ Route::get('/device-info/{client?}/{status?}', DeviceInfo::class)
 Route::get('/client-device-summary', ClientDeviceSummary::class)
     ->middleware(['auth', 'verified'])
     ->name('client-device-summary');
-

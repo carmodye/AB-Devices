@@ -18,23 +18,17 @@
                                 @endif
                             </div>
                             <div class="mt-4 sm:mt-0 sm:ml-4">
-    <button wire:click="refreshDevices" wire:loading.attr="disabled"
-        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
-        Refresh Devices
-    </button>
-</div>
-{{-- 
-
-                            <div class="mt-4 sm:mt-0 sm:ml-4">
-                                <button wire:click="manualLoad" wire:loading.attr="disabled"
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:bg-blue-500 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 disabled:opacity-25">
-                                    Manual Load
-                                </button>
-                            </div> --}}
-
-
+                                <button wire:click="refreshDevices" wire:loading.attr="disabled"
+                                class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent 
+                                rounded-md font-semibold text-xs text-white uppercase 
+                                tracking-widest hover:bg-blue-500 focus:bg-blue-500 
+                                active:bg-blue-700 focus:outline-none focus:ring-2 
+                                focus:ring-indigo-500 focus:ring-offset-2 
+                                transition ease-in-out duration-150 disabled:opacity-25">
+                                Refresh Devices
+                                </button> 
+                            </div>
                         </div>
-
                         {{-- Spinner for Loading States --}}
                         <div wire:loading wire:loading.delay class="mt-4 flex justify-center">
                             <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12">
@@ -314,6 +308,4 @@
             </div>
         </div>
     </div>
-
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </div>

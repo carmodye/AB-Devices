@@ -9,4 +9,7 @@ $rawClient = $redis->client();
 
 $rawData = $rawClient->get($fullKey);
         
-        
+
+
+        redis-client
+        select 1 get's laravel default area
